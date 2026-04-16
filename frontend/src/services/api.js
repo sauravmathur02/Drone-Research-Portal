@@ -75,13 +75,16 @@ export const signUpUser = (payload) =>
   api.post('/auth/signup', payload).then((response) => response.data);
 
 export const signInUser = (payload) =>
-  api.post('/auth/signin', payload).then((response) => response.data);
+  api.post('/auth/login', payload).then((response) => response.data);
 
 export const getUserSession = () =>
   api.get('/auth/session').then((response) => response.data);
 
 export const getUpdates = (filters = {}) =>
   api.get('/updates', { params: filters }).then((response) => response.data);
+
+export const getHistory = () =>
+  api.get('/history').then((response) => response.data);
 
 export const askAiQuery = (payload) =>
   api.post('/ai-query', payload).then((response) => response.data);

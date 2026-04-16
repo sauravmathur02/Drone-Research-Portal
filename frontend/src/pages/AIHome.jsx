@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, LockKeyhole, LogIn, Search, Send, ShieldCheck, Use
 import {
   askAiQuery,
   clearUserToken,
+  getHistory,
   getUserSession,
   getUserToken,
   setUserToken,
@@ -101,9 +102,8 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
           <button
             type="button"
             onClick={() => setMode('signin')}
-            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${
-              !isSignup ? 'bg-neon text-dark' : 'text-textMuted hover:text-neon'
-            }`}
+            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${!isSignup ? 'bg-neon text-dark' : 'text-textMuted hover:text-neon'
+              }`}
           >
             <LogIn size={15} />
             Sign In
@@ -111,9 +111,8 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
           <button
             type="button"
             onClick={() => setMode('signup')}
-            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${
-              isSignup ? 'bg-warning text-dark' : 'text-textMuted hover:text-warning'
-            }`}
+            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${isSignup ? 'bg-warning text-dark' : 'text-textMuted hover:text-warning'
+              }`}
           >
             <UserPlus size={15} />
             Sign Up
@@ -168,11 +167,10 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`mt-1 flex items-center justify-center gap-2 rounded border px-4 py-3 font-heading text-xs uppercase tracking-widest transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-              isSignup
+            className={`mt-1 flex items-center justify-center gap-2 rounded border px-4 py-3 font-heading text-xs uppercase tracking-widest transition-all disabled:cursor-not-allowed disabled:opacity-60 ${isSignup
                 ? 'border-warning bg-warning/10 text-warning hover:bg-warning hover:text-dark'
                 : 'border-neon bg-neon/10 text-neon hover:bg-neon hover:text-dark'
-            }`}
+              }`}
           >
             {isSubmitting ? <Loader2 className="animate-spin" size={15} /> : isSignup ? <UserPlus size={15} /> : <LogIn size={15} />}
             {isSubmitting ? 'Authenticating...' : isSignup ? 'Create Account' : 'Sign In'}
@@ -224,9 +222,20 @@ export default function AIHome({ onOpenDashboard }) {
       .then((response) => {
         if (isActive) {
           setCurrentUser(response.user);
+          return getHistory();
         }
       })
-      .catch(() => {
+      .then((history) => {
+        if (isActive && history) {
+          const loadedMessages = history.flatMap((item) => [
+            { id: `user-hist-${item._id}`, role: 'user', text: item.question },
+            { id: `ai-hist-${item._id}`, role: 'ai', answer: item.answer, confidence: 'Historical', source: 'Database History' }
+          ]);
+          setMessages(loadedMessages);
+        }
+      })
+      .catch((error) => {
+        console.error('Session or history retrieval failed', error);
         clearUserToken();
       })
       .finally(() => {
@@ -257,6 +266,14 @@ export default function AIHome({ onOpenDashboard }) {
     setCurrentUser(user);
     setIsAuthModalOpen(false);
     storeQueryCount(0);
+
+    getHistory().then((history) => {
+      const loadedMessages = history.flatMap((item) => [
+        { id: `user-hist-${item._id}`, role: 'user', text: item.question },
+        { id: `ai-hist-${item._id}`, role: 'ai', answer: item.answer, confidence: 'Historical', source: 'Database History' }
+      ]);
+      setMessages(loadedMessages);
+    }).catch(console.error);
   }
 
   function handleSignOut() {

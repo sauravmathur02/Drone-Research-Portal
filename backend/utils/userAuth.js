@@ -1,70 +1,31 @@
-const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const TOKEN_SECRET = process.env.USER_TOKEN_SECRET || 'dronescope-user-secret';
-const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const HASH_ITERATIONS = 120000;
-const HASH_LENGTH = 64;
-const HASH_DIGEST = 'sha512';
+const TOKEN_TTL = '7d';
 
-function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-  const hash = crypto
-    .pbkdf2Sync(password, salt, HASH_ITERATIONS, HASH_LENGTH, HASH_DIGEST)
-    .toString('hex');
-
-  return { hash, salt };
+async function hashPassword(password) {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
 }
 
-function verifyPassword(password, salt, expectedHash) {
-  const { hash } = hashPassword(password, salt);
-
-  if (!expectedHash || hash.length !== expectedHash.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
-}
-
-function createSignature(payload) {
-  return crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('hex');
+async function verifyPassword(password, expectedHash) {
+  if (!expectedHash) return false;
+  return bcrypt.compare(password, expectedHash);
 }
 
 function generateUserToken(user) {
-  const data = JSON.stringify({
-    sub: user._id.toString(),
-    email: user.email,
-    name: user.name,
-    exp: Date.now() + TOKEN_TTL_MS,
-  });
-  const encodedPayload = Buffer.from(data).toString('base64url');
-  const signature = createSignature(encodedPayload);
-
-  return `${encodedPayload}.${signature}`;
+  return jwt.sign(
+    { sub: user._id.toString(), email: user.email, name: user.name },
+    TOKEN_SECRET,
+    { expiresIn: TOKEN_TTL }
+  );
 }
 
 function verifyUserToken(token) {
-  if (!token || !token.includes('.')) {
-    return null;
-  }
-
-  const [encodedPayload, signature] = token.split('.');
-  const expectedSignature = createSignature(encodedPayload);
-
-  if (!signature || signature.length !== expectedSignature.length) {
-    return null;
-  }
-
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-    return null;
-  }
-
   try {
-    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'));
-
-    if (!payload.exp || payload.exp < Date.now() || !payload.sub) {
-      return null;
-    }
-
-    return payload;
+    const decoded = jwt.verify(token, TOKEN_SECRET);
+    return decoded;
   } catch (error) {
     return null;
   }

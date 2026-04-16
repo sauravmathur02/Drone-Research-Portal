@@ -51,12 +51,12 @@ exports.signup = async (req, res) => {
       return res.status(409).json({ error: 'An account already exists for this email.' });
     }
 
-    const { hash, salt } = hashPassword(req.body.password);
+    const hashedPassword = await hashPassword(req.body.password);
+    
     const user = await User.create({
       name: req.body.name.trim(),
       email,
-      password_hash: hash,
-      password_salt: salt,
+      password: hashedPassword,
       last_login_at: new Date(),
     });
 
@@ -69,7 +69,7 @@ exports.signup = async (req, res) => {
   }
 };
 
-exports.signin = async (req, res) => {
+exports.login = async (req, res) => {
   try {
     const validationError = validateAuthPayload(req.body, 'signin');
 
@@ -78,9 +78,9 @@ exports.signin = async (req, res) => {
     }
 
     const email = normalizeEmail(req.body.email);
-    const user = await User.findOne({ email }).select('+password_hash +password_salt');
+    const user = await User.findOne({ email }).select('+password');
 
-    if (!user || !verifyPassword(req.body.password, user.password_salt, user.password_hash)) {
+    if (!user || !(await verifyPassword(req.body.password, user.password))) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 

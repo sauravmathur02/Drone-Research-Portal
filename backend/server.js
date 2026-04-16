@@ -1,7 +1,7 @@
+require('dotenv').config();
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+const connectDB = require('./config/db');
 const seedDatabase = require('./seedData');
 const { startLiveNewsUpdates } = require('./services/newsUpdateService');
 
@@ -19,22 +19,10 @@ app.use('/api', apiRoutes);
 // Database Connection & Server Start
 async function startServer() {
   try {
-    let mongoUri = process.env.MONGODB_URI;
+    // Connect to MongoDB Atlas (via config/db.js)
+    await connectDB();
 
-    // Use memory server if no real URI is provided
-    if (!mongoUri) {
-      console.log('No MONGODB_URI found. Initializing in-memory MongoDB...');
-      const mongoServer = await MongoMemoryServer.create();
-      mongoUri = mongoServer.getUri();
-    }
-
-    await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-    console.log(`Connected to MongoDB Atlas / Memory Server: ${mongoUri.split('@').pop()}`);
-
-    // Seed Data if DB is likely empty
+    // Optionally seed Data if DB is likely empty
     await seedDatabase();
     await startLiveNewsUpdates();
 

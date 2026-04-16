@@ -14,7 +14,7 @@ const droneSpecsSchema = new mongoose.Schema(
 
 const droneSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  country: { type: String, required: true, trim: true },
+  country: { type: String, required: true, trim: true, index: true },
   type: {
     type: String,
     enum: ['Nano', 'Tactical', 'MALE', 'HALE', 'Loitering', 'Swarm'],

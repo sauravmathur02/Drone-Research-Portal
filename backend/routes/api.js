@@ -2,7 +2,9 @@ const express = require('express');
 const apiController = require('../controllers/apiController');
 const adminController = require('../controllers/adminController');
 const updateController = require('../controllers/updateController');
+const requireAuth = require('../middleware/requireAuth');
 const requireAdminAuth = require('../middleware/requireAdminAuth');
+const historyController = require('../controllers/historyController');
 const aiRoutes = require('./aiRoutes');
 const authRoutes = require('./authRoutes');
 
@@ -11,6 +13,7 @@ const router = express.Router();
 router.use(authRoutes);
 router.use(aiRoutes);
 
+router.get('/history', requireAuth, historyController.getHistory);
 router.post('/admin/login', adminController.login);
 router.get('/admin/session', adminController.session);
 router.get('/updates', updateController.getUpdates);

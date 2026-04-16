@@ -1,4 +1,6 @@
 const { answerAiQuery } = require('../services/aiService');
+const History = require('../models/History');
+const { verifyUserToken, extractUserToken } = require('../utils/userAuth');
 
 exports.query = async (req, res) => {
   try {
@@ -6,6 +8,18 @@ exports.query = async (req, res) => {
       query: req.body.query,
       previousQuery: req.body.previousQuery,
     });
+
+    const token = extractUserToken(req);
+    if (token) {
+      const payload = verifyUserToken(token);
+      if (payload && payload.sub) {
+        await History.create({
+          user_id: payload.sub,
+          question: req.body.query,
+          answer: response.answer,
+        });
+      }
+    }
 
     res.json(response);
   } catch (error) {
