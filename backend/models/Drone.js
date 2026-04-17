@@ -22,6 +22,8 @@ const droneSchema = new mongoose.Schema({
   },
   specs: { type: droneSpecsSchema, required: true },
   description: { type: String, default: '' },
+  photo_url: { type: String, default: '' },
+  model_url: { type: String, default: '' },
 });
 
 module.exports = mongoose.model('Drone', droneSchema);

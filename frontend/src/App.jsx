@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Globe, Database, Scale, Shield, BrainCircuit, Activity, Settings2, Bell, Search } from 'lucide-react';
+import { Globe, Database, Scale, Shield, BrainCircuit, Activity, Settings2, Bell, Search, Flag } from 'lucide-react';
 import AIHome from './pages/AIHome';
 import GlobalCommand from './pages/GlobalCommand';
 import DroneDatabase from './pages/DroneDatabase';
@@ -8,6 +8,7 @@ import ComparisonTool from './pages/ComparisonTool';
 import CounterSystems from './pages/CounterSystems';
 import Simulation from './pages/Simulation';
 import AdminPanel from './pages/AdminPanel';
+import CountryOverview from './pages/CountryOverview';
 import SplashScreen from './components/SplashScreen';
 import UpdatesPanel from './components/UpdatesPanel';
 import ToastAlert from './components/ToastAlert';
@@ -19,6 +20,7 @@ const routeTitles = {
   '/database': 'Drone Database',
   '/compare': 'Platform Comparison',
   '/counters': 'Counter-Drone Systems',
+  '/countries': 'Global Arsenals',
   '/simulation': 'AI Simulation',
   '/admin': 'Admin Control',
 };
@@ -123,6 +125,7 @@ function AppShell() {
           <SidebarLink to="/command" icon={<Globe size={18} />} label="Global Command" />
           <SidebarLink to="/database" icon={<Database size={18} />} label="Drone Database" />
           <SidebarLink to="/compare" icon={<Scale size={18} />} label="Comparison Tool" />
+          <SidebarLink to="/countries" icon={<Flag size={18} />} label="Country Arsenals" />
           <SidebarLink to="/counters" icon={<Shield size={18} />} label="Counter-Drone" />
           <SidebarLink to="/simulation" icon={<BrainCircuit size={18} />} label="AI Simulation" />
           <SidebarLink to="/admin" icon={<Settings2 size={18} />} label="Admin Control" />
@@ -164,6 +167,7 @@ function AppShell() {
             <Route path="/command" element={<GlobalCommand />} />
             <Route path="/database" element={<DroneDatabase />} />
             <Route path="/compare" element={<ComparisonTool />} />
+            <Route path="/countries" element={<CountryOverview />} />
             <Route path="/counters" element={<CounterSystems />} />
             <Route path="/simulation" element={<Simulation />} />
             <Route path="/admin" element={<AdminPanel />} />

@@ -78,6 +78,7 @@ async function seedDatabase() {
         speed_kmh: 21,
         maintenance_cost_per_hr: 50,
       },
+      photo_url: '/drones/blackhornet.png',
       description: 'Ultra-light reconnaissance drone for close-range intelligence gathering.',
     },
     {
@@ -92,6 +93,7 @@ async function seedDatabase() {
         speed_kmh: 330,
         maintenance_cost_per_hr: 1200,
       },
+      photo_url: '/drones/ch4.jpg',
       description: 'Medium-altitude drone built for surveillance and precision strike support.',
     },
     {
@@ -106,6 +108,7 @@ async function seedDatabase() {
         speed_kmh: 480,
         maintenance_cost_per_hr: 3600,
       },
+      photo_url: '/drones/mq9.jpg',
       description: 'Long-range ISR and strike drone with heavy payload flexibility.',
     },
     {
@@ -120,6 +123,7 @@ async function seedDatabase() {
         speed_kmh: 220,
         maintenance_cost_per_hr: 800,
       },
+      photo_url: '/drones/tb2.png',
       description: 'Combat-proven tactical UAV for intelligence and light strike missions.',
     },
     {
@@ -134,6 +138,7 @@ async function seedDatabase() {
         speed_kmh: 185,
         maintenance_cost_per_hr: 10,
       },
+      photo_url: '/drones/shahed136.jpg',
       description: 'Long-range loitering munition designed for saturation attacks.',
     },
     {
@@ -148,6 +153,7 @@ async function seedDatabase() {
         speed_kmh: 100,
         maintenance_cost_per_hr: 20,
       },
+      photo_url: '/drones/hero120.jpg',
       description: 'Portable loitering platform suited to tactical precision engagements.',
     },
     {
@@ -162,6 +168,7 @@ async function seedDatabase() {
         speed_kmh: 224,
         maintenance_cost_per_hr: 900,
       },
+      photo_url: '/drones/tapas.jpg',
       description: 'Endurance-focused surveillance drone for medium-altitude missions.',
     },
     {
@@ -176,6 +183,7 @@ async function seedDatabase() {
         speed_kmh: 120,
         maintenance_cost_per_hr: 10,
       },
+      photo_url: '/drones/swarmx.jpg',
       description: 'Autonomous low-cost drone optimized for coordinated swarm attacks.',
     },
   ];

@@ -63,26 +63,40 @@ export default function ComparisonTool() {
   return (
     <div className="h-full flex flex-col items-center">
       <div className="glass-card w-full max-w-5xl flex flex-col h-full">
-        <div className="flex justify-between border-b border-border pb-5 mb-5 items-center">
-          <select
-            className="bg-black/50 border border-neon/50 text-neon p-3 rounded font-heading w-[40%] outline-none focus:border-neon"
-            value={drone1 ? drone1._id : ''}
-            onChange={(event) => setDrone1(drones.find((drone) => drone._id === event.target.value))}
-          >
-            {drones.map((drone) => <option key={`left-${drone._id}`} value={drone._id}>{drone.name} ({drone.country})</option>)}
-          </select>
+        <div className="flex justify-between border-b border-border pb-5 mb-5 items-start">
+          <div className="w-[40%] flex flex-col gap-4">
+            <select
+              className="bg-black/50 border border-neon/50 text-neon p-3 rounded font-heading w-full outline-none focus:border-neon"
+              value={drone1 ? drone1._id : ''}
+              onChange={(event) => setDrone1(drones.find((drone) => drone._id === event.target.value))}
+            >
+              {drones.map((drone) => <option key={`left-${drone._id}`} value={drone._id}>{drone.name} ({drone.country})</option>)}
+            </select>
+            {drone1 && (
+              <div className="h-48 w-full rounded-lg overflow-hidden border border-white/10 relative">
+                <img src={drone1.photo_url} alt={drone1.name} loading="lazy" onError={(e) => { e.target.onerror=null; e.target.src="/drones/default.jpg"; }} className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
 
-          <div className="w-[10%] flex justify-center text-border">
+          <div className="w-[10%] flex justify-center text-border pt-4">
             <Scale size={42} strokeWidth={1} />
           </div>
 
-          <select
-            className="bg-black/50 border border-neon/50 text-neon p-3 rounded font-heading w-[40%] outline-none focus:border-neon"
-            value={drone2 ? drone2._id : ''}
-            onChange={(event) => setDrone2(drones.find((drone) => drone._id === event.target.value))}
-          >
-            {drones.map((drone) => <option key={`right-${drone._id}`} value={drone._id}>{drone.name} ({drone.country})</option>)}
-          </select>
+          <div className="w-[40%] flex flex-col gap-4">
+            <select
+              className="bg-black/50 border border-neon/50 text-neon p-3 rounded font-heading w-full outline-none focus:border-neon"
+              value={drone2 ? drone2._id : ''}
+              onChange={(event) => setDrone2(drones.find((drone) => drone._id === event.target.value))}
+            >
+              {drones.map((drone) => <option key={`right-${drone._id}`} value={drone._id}>{drone.name} ({drone.country})</option>)}
+            </select>
+            {drone2 && (
+              <div className="h-48 w-full rounded-lg overflow-hidden border border-white/10 relative">
+                <img src={drone2.photo_url} alt={drone2.name} loading="lazy" onError={(e) => { e.target.onerror=null; e.target.src="/drones/default.jpg"; }} className="w-full h-full object-cover" />
+              </div>
+            )}
+          </div>
         </div>
 
         {drone1 && drone2 && (

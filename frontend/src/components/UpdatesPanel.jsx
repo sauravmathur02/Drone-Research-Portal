@@ -16,8 +16,13 @@ export default function UpdatesPanel({ open, updates, onClose }) {
   const [severityFilter, setSeverityFilter] = useState('All');
   const [countryFilter, setCountryFilter] = useState('All');
 
+  const defaultCountries = ['GLOBAL', 'IND', 'USA', 'CHN', 'RUS', 'UKR', 'ISR', 'IRN'];
+  
   const countryOptions = useMemo(
-    () => Array.from(new Set(updates.map((update) => update.country).filter(Boolean))).sort(),
+    () => {
+      const dynamicCountries = updates.map((update) => update.country).filter(Boolean);
+      return Array.from(new Set([...defaultCountries, ...dynamicCountries])).sort();
+    },
     [updates]
   );
 
