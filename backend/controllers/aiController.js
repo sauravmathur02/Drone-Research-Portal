@@ -11,13 +11,17 @@ exports.query = async (req, res) => {
 
     const token = extractUserToken(req);
     if (token) {
-      const payload = verifyUserToken(token);
-      if (payload && payload.sub) {
-        await History.create({
-          user_id: payload.sub,
-          question: req.body.query,
-          answer: response.answer,
-        });
+      try {
+        const payload = verifyUserToken(token);
+        if (payload && payload.sub) {
+          await History.create({
+            user_id: payload.sub,
+            question: req.body.query,
+            answer: response.analysis || response.answer, // Unified field
+          });
+        }
+      } catch (historyErr) {
+        console.warn('History persistence skipped:', historyErr.message);
       }
     }
 

@@ -15,6 +15,8 @@ const counterSystemSchema = new mongoose.Schema({
     required: true,
   },
   description: { type: String, default: '' },
+  photo_url: { type: String, default: '' },
+  model_url: { type: String, default: '' },
 });
 
 module.exports = mongoose.model('CounterSystem', counterSystemSchema);

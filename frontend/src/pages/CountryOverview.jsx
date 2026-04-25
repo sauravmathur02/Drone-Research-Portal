@@ -2,9 +2,8 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Loader2, Flag, ChevronDown, ChevronRight, Crosshair, Shield, X, Box } from 'lucide-react';
 import { getCountries, getDrones } from '../services/api';
 
-const Drone3DModal = React.lazy(() => import('../components/Drone3DModal'));
-
-
+import Drone3DModal from '../components/Drone3DModal';
+import DroneCard from '../components/DroneCard';
 
 export default function CountryOverview() {
   const [countries, setCountries] = useState([]);
@@ -87,45 +86,15 @@ export default function CountryOverview() {
               {isExpanded && (
                 <div className="border-t border-border bg-black/20 p-5">
                   {countryDrones.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {countryDrones.map(drone => (
-                        <div 
-                          key={drone._id} 
-                          className="group cursor-pointer rounded bg-panel overflow-hidden border border-white/10 hover:border-neon/50 hover:shadow-[0_0_20px_rgba(0,243,255,0.15)] transition-all"
-                          onClick={() => setSelectedDrone(drone)}
-                        >
-                          <div className="h-32 w-full overflow-hidden rounded-t-lg relative">
-                            <img
-                              src={drone.photo_url}
-                              alt={drone.name}
-                              loading="lazy"
-                              onError={(e) => { e.target.onerror = null; e.target.src = "/drones/default.jpg"; }}
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                            <span className="absolute top-2 right-2 text-[10px] uppercase font-data tracking-widest text-neon bg-black/80 border border-neon/50 px-2 py-1 rounded z-10">
-                              {drone.type}
-                            </span>
-                          </div>
-
-                          <div className="p-4 relative z-10 bg-panel/90">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-heading text-white group-hover:text-neon transition-colors">{drone.name}</h4>
-                            </div>
-                            <p className="text-xs text-textMuted mb-3 line-clamp-2 min-h-[32px]">
-                              {drone.description}
-                            </p>
-                            <div className="grid grid-cols-2 gap-2 text-xs font-data border-t border-white/5 pt-3">
-                              <div>
-                                <span className="text-textMuted block text-[10px]">RANGE</span>
-                                <span className="text-white">{drone.specs.range_km} km</span>
-                              </div>
-                              <div>
-                                <span className="text-textMuted block text-[10px]">PAYLOAD</span>
-                                <span className="text-white">{drone.specs.payload_kg} kg</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                    /* Standardized Grid Layout */
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {countryDrones.map((drone, i) => (
+                        <DroneCard 
+                           key={drone._id} 
+                           drone={drone} 
+                           index={i}
+                           onClick={() => setSelectedDrone(drone)}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -141,10 +110,9 @@ export default function CountryOverview() {
       </div>
 
       {selectedDrone && (
-        <Suspense fallback={null}>
-          <Drone3DModal drone={selectedDrone} onClose={() => setSelectedDrone(null)} />
-        </Suspense>
+        <Drone3DModal drone={selectedDrone} onClose={() => setSelectedDrone(null)} />
       )}
     </div>
   );
 }
+

@@ -12,16 +12,16 @@ function formatTimestamp(timestamp) {
   return date.toLocaleString();
 }
 
-export default function UpdatesPanel({ open, updates, onClose }) {
+const DEFAULT_COUNTRIES = ['GLOBAL', 'IND', 'USA', 'CHN', 'RUS', 'UKR', 'ISR', 'IRN'];
+
+export default function UpdatesPanel({ open, updates, onClose, onClearAll }) {
   const [severityFilter, setSeverityFilter] = useState('All');
   const [countryFilter, setCountryFilter] = useState('All');
 
-  const defaultCountries = ['GLOBAL', 'IND', 'USA', 'CHN', 'RUS', 'UKR', 'ISR', 'IRN'];
-  
   const countryOptions = useMemo(
     () => {
       const dynamicCountries = updates.map((update) => update.country).filter(Boolean);
-      return Array.from(new Set([...defaultCountries, ...dynamicCountries])).sort();
+      return Array.from(new Set([...DEFAULT_COUNTRIES, ...dynamicCountries])).sort();
     },
     [updates]
   );
@@ -55,13 +55,24 @@ export default function UpdatesPanel({ open, updates, onClose }) {
                 Live Drone Intelligence Feed
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-10 h-10 rounded border border-white/10 flex items-center justify-center text-textMuted hover:text-white hover:border-border transition-all"
-            >
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-2">
+              {updates.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onClearAll}
+                  className="px-3 h-10 rounded border border-danger/30 text-danger hover:bg-danger/10 hover:border-danger transition-all font-data text-xs uppercase tracking-wider"
+                >
+                  Clear All
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-10 h-10 rounded border border-white/10 flex items-center justify-center text-textMuted hover:text-white hover:border-border transition-all"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="p-6 border-b border-white/5 flex gap-3">
@@ -120,7 +131,7 @@ export default function UpdatesPanel({ open, updates, onClose }) {
                       <h3 className="font-heading text-base leading-snug">{update.title}</h3>
                     )}
                     <div className="font-data text-[11px] text-textMuted uppercase tracking-widest mt-2">
-                      {update.country || 'GLOBAL'} • {update.category || 'General'} • {update.source}
+                      {update.country || 'GLOBAL'} - {update.category || 'General'} - {update.source}
                     </div>
                   </div>
                   <span className={`px-2 py-1 rounded border text-xs font-data uppercase ${severityStyles[update.severity] || severityStyles.Low}`}>

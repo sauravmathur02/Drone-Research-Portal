@@ -110,6 +110,11 @@ exports.getDrones = async (req, res) => {
       filters.country = req.query.country;
     }
 
+    if (req.query.search) {
+      const q = new RegExp(req.query.search, 'i');
+      filters.$or = [{ name: q }, { country: q }];
+    }
+
     const drones = await Drone.find(filters).sort({ name: 1 });
     res.json(drones);
   } catch (error) {

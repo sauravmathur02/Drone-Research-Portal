@@ -1,7 +1,23 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, Grid, Html } from '@react-three/drei';
+import { OrbitControls, useGLTF, Environment, Grid, Html, Clone } from '@react-three/drei';
+
+class ModelErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 function Hotspot({ position, title, description, isActive }) {
   const [hovered, setHovered] = useState(false);
@@ -40,7 +56,7 @@ function Model({ url }) {
     }
   });
 
-  return <primitive ref={groupRef} object={scene} scale={0.01} />;
+  return <Clone ref={groupRef} object={scene} scale={0.01} />;
 }
 
 // Procedural Hologram for Quadcopters (Tactical, Nano, Swarm)
@@ -211,9 +227,13 @@ export default function Drone3DViewer({ drone, dataMode }) {
       <Environment preset="city" />
 
       {drone.model_url ? (
-        <React.Suspense fallback={null}>
-          <Model url={drone.model_url} />
-        </React.Suspense>
+        <ModelErrorBoundary fallback={
+          isQuadcopter ? <QuadcopterHologram dataMode={dataMode} drone={drone} /> : <FixedWingHologram dataMode={dataMode} drone={drone} />
+        }>
+          <React.Suspense fallback={null}>
+            <Model url={drone.model_url} />
+          </React.Suspense>
+        </ModelErrorBoundary>
       ) : (
         isQuadcopter ? <QuadcopterHologram dataMode={dataMode} drone={drone} /> : <FixedWingHologram dataMode={dataMode} drone={drone} />
       )}

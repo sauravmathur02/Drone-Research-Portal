@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: dronescope-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: dronescope
+
+  app:
+    build: .
+    container_name: dronescope-app
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    depends_on:
+      - mongodb
+    environment:
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/dronescope
+      FRONTEND_URL: http://localhost:5000
+      NODE_ENV: production
+
+volumes:
+  mongo-data:

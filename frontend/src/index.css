@@ -3,17 +3,46 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-dark: #05070d;
+    --color-darker: #020408;
+    --color-neon: #00ffff;
+    --color-neon-dim: rgba(0, 255, 255, 0.4);
+    --color-danger: #ff3b3b;
+    --color-warning: #ffcc00;
+  }
+
   body {
     @apply bg-dark text-textMain font-body overflow-x-hidden;
-    background-image: 
-        radial-gradient(circle at 15% 50%, rgba(0, 243, 255, 0.05), transparent 25%),
-        radial-gradient(circle at 85% 30%, rgba(255, 51, 102, 0.03), transparent 25%);
+    /* Clean, extremely subtle premium glow inspired by Linear/Vercel */
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.04), transparent 40%),
+      radial-gradient(circle at 100% 100%, rgba(255, 255, 255, 0.02), transparent 40%);
+    min-height: 100vh;
   }
 }
 
 @layer components {
   .glass-card {
-    @apply bg-panel backdrop-blur-glass border border-border rounded-lg p-6 shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:border-neon/40;
+    @apply bg-panel backdrop-blur-glass border border-white/5 rounded-2xl p-6 shadow-sm transition-all duration-300 hover:border-white/10 hover:bg-[#111111] hover:shadow-lg;
+  }
+
+  .neon-text {
+    @apply text-neon;
+    text-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+  }
+
+  .tactical-border {
+    @apply relative border border-white/5 rounded-lg overflow-hidden;
+  }
+
+  .tactical-border::before {
+    content: '';
+    @apply absolute -top-[1px] -left-[1px] w-6 h-6 border-t border-l border-white/20 opacity-0 transition-opacity duration-300 rounded-tl-lg;
+  }
+
+  .group:hover .tactical-border::before {
+    @apply opacity-100 border-neon/50;
   }
 }
 
@@ -21,16 +50,20 @@
   from {
     transform: translate3d(0, 0, 0) scale(1);
   }
+
   to {
     transform: translate3d(0, -40px, 0) scale(1.05);
   }
 }
 
 @keyframes introPulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.35;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.08);
@@ -59,22 +92,27 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 243, 255, 0.25);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 @keyframes aiGridDrift {
   from {
     transform: translate3d(0, 0, 0);
   }
+
   to {
     transform: translate3d(-56px, -56px, 0);
   }
@@ -85,9 +123,12 @@
     transform: translateX(-30vw);
     opacity: 0;
   }
-  15%, 80% {
+
+  15%,
+  80% {
     opacity: 0.8;
   }
+
   100% {
     transform: translateX(80vw);
     opacity: 0;
@@ -95,10 +136,13 @@
 }
 
 @keyframes aiRoutePulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.16;
     transform: scaleX(0.88);
   }
+
   50% {
     opacity: 0.55;
     transform: scaleX(1);
@@ -106,9 +150,12 @@
 }
 
 @keyframes aiMapBreath {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.18;
   }
+
   50% {
     opacity: 0.34;
   }
@@ -117,22 +164,19 @@
 .ai-home::before {
   content: '';
   position: absolute;
-  inset: -80px;
+  inset: 0;
   background-image:
-    linear-gradient(rgba(0, 243, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 243, 255, 0.055) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: linear-gradient(to bottom, transparent, black 18%, black 78%, transparent);
-  animation: aiGridDrift 18s linear infinite;
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, black 10%, transparent 80%);
 }
 
 .ai-home::after {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 50% 28%, rgba(0, 243, 255, 0.14), transparent 30%),
-    linear-gradient(180deg, rgba(5, 9, 20, 0.2), #050914 82%);
+  background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08), transparent 50%);
   pointer-events: none;
 }
 
@@ -232,7 +276,77 @@
   animation-delay: 1.2s;
 }
 
+/* Premium Tactical Animations */
+@keyframes tacticalBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-tactical-blink {
+  animation: tacticalBlink 3s ease-in-out infinite;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* Leaflet Overrides */
-.leaflet-container { background: #050914 !important; font-family: 'Roboto Mono', monospace !important; }
-.leaflet-popup-content-wrapper { background: rgba(10,15,30,0.9) !important; color: #e0e6ed !important; border: 1px solid #00f3ff !important; backdrop-filter: blur(10px); }
-.leaflet-popup-tip { background: rgba(10,15,30,0.9) !important; border: 1px solid #00f3ff !important; }
+.leaflet-container {
+  background: #05070d !important;
+  font-family: 'Roboto Mono', monospace !important;
+  filter: saturate(1.2) contrast(1.1);
+}
+
+.leaflet-tile {
+  filter: brightness(0.7) contrast(1.2) grayscale(0.2);
+}
+
+.leaflet-popup-content-wrapper {
+  background: rgba(5, 7, 13, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(0, 255, 255, 0.3) !important;
+  backdrop-filter: blur(12px);
+  border-radius: 8px !important;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
+}
+
+.leaflet-popup-tip {
+  background: rgba(5, 7, 13, 0.9) !important;
+  border: 1px solid rgba(0, 255, 255, 0.3) !important;
+}

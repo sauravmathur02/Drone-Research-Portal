@@ -11,7 +11,7 @@ export default function Drone3DModal({ drone, onClose }) {
   if (!drone) return null;
 
   // Derive role heuristically
-  const role = drone.specs?.payload_kg > 100 || ["MALE", "HALE"].includes(drone.type) 
+  const role = drone.specs?.payload_kg > 100 || ["MALE", "HALE", "UCAV"].includes(drone.type) 
     ? "Surveillance & Strike" 
     : "Tactical Reconnaissance";
 
@@ -21,18 +21,18 @@ export default function Drone3DModal({ drone, onClose }) {
         
         {/* TOP LEFT: Info Header */}
         <div className="absolute top-0 left-0 p-6 z-10 pointer-events-none flex items-start gap-5">
-          {drone.photo_url && (
-            <div className="h-20 w-20 md:h-24 md:w-24 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-black/50 backdrop-blur-md shadow-lg">
-              <img src={drone.photo_url} alt={drone.name} loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = "/drones/default.jpg"; }} className="w-full h-full object-cover" />
+          {drone.image && (
+            <div className="h-20 w-20 md:h-24 md:w-24 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-black backdrop-blur-md shadow-lg flex items-center justify-center p-2">
+              <img src={drone.image} alt={drone.name} loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = "/drones/default.jpg"; }} className="w-full h-full object-contain" />
             </div>
           )}
           <div>
             <h2 className="font-heading text-3xl text-white drop-shadow-lg">{drone.name}</h2>
             <div className="flex items-center gap-3 mt-2 font-data text-sm text-neon drop-shadow-md">
               <span className="bg-neon/10 border border-neon/30 px-2 py-0.5 rounded">{drone.country}</span>
-              <span>•</span>
+              <span> - </span>
               <span className="uppercase tracking-widest">{drone.type}</span>
-              <span>•</span>
+              <span> - </span>
               <span className="flex items-center gap-1 text-white/80">
                 <Target size={14} className="text-warning" /> {role}
               </span>
@@ -144,7 +144,7 @@ export default function Drone3DModal({ drone, onClose }) {
         {!dataMode && (
           <div className="absolute bottom-6 w-full text-center pointer-events-none z-10 animate-in fade-in duration-500">
             <span className="font-data text-xs tracking-widest uppercase text-textMuted bg-black/40 px-4 py-2 rounded-full border border-white/5 backdrop-blur-sm">
-              Left Click: Rotate • Scroll: Zoom • Right Click: Pan
+              Left Click: Rotate - Scroll: Zoom - Right Click: Pan
             </span>
           </div>
         )}

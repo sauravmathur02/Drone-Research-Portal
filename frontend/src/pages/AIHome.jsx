@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import { ArrowRight, Loader2, LockKeyhole, LogIn, Search, Send, ShieldCheck, UserPlus } from 'lucide-react';
+
+// Lazy-load the 3D background so it doesn't block the initial UI paint
+const DroneBackground3D = lazy(() => import('../components/DroneBackground3D'));
 import {
   askAiQuery,
   clearUserToken,
@@ -84,25 +87,25 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
-      <div className="w-full max-w-md rounded-lg border border-neon/30 bg-[#07101f]/95 p-6 shadow-[0_0_40px_rgba(0,243,255,0.14)]">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded border border-warning/40 bg-warning/10 text-warning">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#09090b] p-8 shadow-2xl">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white">
             <LockKeyhole size={20} />
           </div>
           <div>
-            <h2 className="font-heading text-lg text-white">
-              {isSignup ? 'Create Analyst Account' : 'Advanced Access Required'}
+            <h2 className="font-heading text-xl font-medium tracking-tight text-white">
+              {isSignup ? 'Create Account' : 'Welcome Back'}
             </h2>
-            <p className="mt-1 text-sm text-textMuted">Sign in to continue accessing advanced intelligence</p>
+            <p className="mt-1 text-sm text-textMuted">Sign in to continue to intelligence portal</p>
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded border border-white/10 bg-black/30 p-1">
+        <div className="mb-6 grid grid-cols-2 gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-1.5">
           <button
             type="button"
             onClick={() => setMode('signin')}
-            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${!isSignup ? 'bg-neon text-dark' : 'text-textMuted hover:text-neon'
+            className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 font-medium text-sm transition-all ${!isSignup ? 'bg-white/10 text-white shadow-sm' : 'text-textMuted hover:text-white'
               }`}
           >
             <LogIn size={15} />
@@ -111,7 +114,7 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
           <button
             type="button"
             onClick={() => setMode('signup')}
-            className={`flex items-center justify-center gap-2 rounded px-3 py-2 font-heading text-xs uppercase tracking-widest transition-all ${isSignup ? 'bg-warning text-dark' : 'text-textMuted hover:text-warning'
+            className={`flex items-center justify-center gap-2 rounded-md px-3 py-2 font-medium text-sm transition-all ${isSignup ? 'bg-white/10 text-white shadow-sm' : 'text-textMuted hover:text-white'
               }`}
           >
             <UserPlus size={15} />
@@ -167,10 +170,7 @@ function AuthModal({ initialMode, onClose, onAuthenticated }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`mt-1 flex items-center justify-center gap-2 rounded border px-4 py-3 font-heading text-xs uppercase tracking-widest transition-all disabled:cursor-not-allowed disabled:opacity-60 ${isSignup
-                ? 'border-warning bg-warning/10 text-warning hover:bg-warning hover:text-dark'
-                : 'border-neon bg-neon/10 text-neon hover:bg-neon hover:text-dark'
-              }`}
+            className={`mt-4 flex items-center justify-center gap-2 rounded-lg border px-4 py-3 font-medium text-sm transition-all disabled:cursor-not-allowed disabled:opacity-50 border-white text-dark bg-white hover:bg-white/90`}
           >
             {isSubmitting ? <Loader2 className="animate-spin" size={15} /> : isSignup ? <UserPlus size={15} /> : <LogIn size={15} />}
             {isSubmitting ? 'Authenticating...' : isSignup ? 'Create Account' : 'Sign In'}
@@ -346,6 +346,11 @@ export default function AIHome({ onOpenDashboard }) {
 
   return (
     <div className="ai-home relative min-h-screen overflow-hidden bg-dark text-textMain">
+      {/* 3D Drone Background — cinematic ambient layer */}
+      <Suspense fallback={null}>
+        <DroneBackground3D />
+      </Suspense>
+
       <div className="ai-map-visual" aria-hidden="true">
         <div className="ai-continent ai-continent-na" />
         <div className="ai-continent ai-continent-sa" />
@@ -406,33 +411,32 @@ export default function AIHome({ onOpenDashboard }) {
 
       <main className="relative z-10 mx-auto flex min-h-[calc(100vh-88px)] w-full max-w-6xl flex-col items-center px-6 pb-12 pt-12 md:pt-20">
         <section className="w-full max-w-4xl text-center">
-          <div className="mb-5 inline-flex items-center gap-2 rounded border border-neon/20 bg-neon/5 px-3 py-1 font-data text-xs uppercase tracking-widest text-neon">
-            <Search size={14} />
-            Real-time drone intelligence
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 font-medium text-xs text-white backdrop-blur-md">
+            <Search size={14} className="text-white/70" />
+            Real-time intelligence
           </div>
-          <h1 className="font-heading text-4xl font-bold text-white md:text-6xl">
-            Drone Intelligence Search
+          <h1 className="font-heading text-5xl font-semibold tracking-tight text-white md:text-7xl">
+            DroneScope AI
           </h1>
-          <p className="mt-4 text-base text-textMuted md:text-lg">
-            Real-time insights powered by AI
+          <p className="mt-6 text-lg text-textMuted md:text-xl font-light max-w-2xl mx-auto">
+            Real-time insights and tactical intelligence powered by enterprise AI.
           </p>
 
           <form
             onSubmit={handleSubmit}
-            className="mt-9 flex items-center gap-3 rounded-lg border border-neon/30 bg-black/45 p-3 shadow-[0_0_50px_rgba(0,243,255,0.12)] backdrop-blur-glass transition-all focus-within:border-neon"
+            className="mt-10 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-2 shadow-xl backdrop-blur-glass transition-all focus-within:border-white/30 focus-within:bg-white/[0.05]"
           >
-            <Search className="ml-2 hidden text-neon md:block" size={21} />
+            <Search className="ml-4 hidden text-textMuted md:block" size={20} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ask anything about global drones..."
-              className="min-w-0 flex-1 bg-transparent px-2 py-3 font-data text-sm text-white outline-none placeholder:text-textMuted md:text-base"
+              placeholder="Ask anything about global drone systems..."
+              className="min-w-0 flex-1 bg-transparent px-3 py-3 font-body text-base text-white outline-none placeholder:text-white/30"
             />
             <button
               type="submit"
               disabled={isLoading || !query.trim()}
-              title="Send intelligence query"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded border border-neon bg-neon/10 text-neon transition-all hover:bg-neon hover:text-dark disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-dark transition-all hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
             </button>
@@ -466,17 +470,17 @@ export default function AIHome({ onOpenDashboard }) {
           )}
         </section>
 
-        <section className="mt-8 grid w-full max-w-5xl gap-4">
+        <section className="mt-12 grid w-full max-w-4xl gap-6">
           {messages.map((message) =>
             message.role === 'user' ? (
               <div key={message.id} className="flex justify-end">
-                <div className="max-w-2xl rounded-lg border border-neon/20 bg-neon/10 px-5 py-4 text-left font-data text-sm text-white">
+                <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/10 px-6 py-4 text-left font-body text-[15px] text-white backdrop-blur-sm">
                   {message.text}
                 </div>
               </div>
             ) : (
-              <div key={message.id} className="rounded-lg border border-white/10 bg-[#07101f]/90 p-5 text-left shadow-xl backdrop-blur-glass">
-                <div className="mb-3 flex items-center gap-2 font-heading text-sm uppercase tracking-widest text-neon">
+              <div key={message.id} className="rounded-2xl border border-white/5 bg-[#0a0a0a]/80 p-6 text-left shadow-sm backdrop-blur-xl">
+                <div className="mb-4 flex items-center gap-2 font-medium text-xs uppercase tracking-wider text-white/50">
                   <ShieldCheck size={16} />
                   AI Intelligence Response
                 </div>

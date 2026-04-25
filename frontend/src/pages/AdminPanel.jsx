@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import DroneCard from '../components/DroneCard';
+import { Layout, Shield, ShieldAlert, Globe, Activity, Layers, Brain } from 'lucide-react';
 import {
   clearAdminToken,
   createCountry,
@@ -19,7 +21,7 @@ import {
   updateDrone,
 } from '../services/api';
 
-const droneTypes = ['Nano', 'Tactical', 'MALE', 'HALE', 'Loitering', 'Swarm'];
+const droneTypes = ['Nano', 'Tactical', 'MALE', 'HALE', 'UCAV', 'Loitering', 'Swarm', 'QUANTUM'];
 const counterTypes = ['Laser', 'Jamming', 'Missile', 'Interceptor'];
 const effectivenessLevels = ['High', 'Medium', 'Low'];
 
@@ -36,6 +38,8 @@ const emptyDrone = {
     speed_kmh: 0,
     maintenance_cost_per_hr: 0,
   },
+  image: '',
+  model_url: '',
 };
 
 const emptyCountry = {
@@ -460,23 +464,21 @@ export default function AdminPanel() {
     setCounterTable((current) => ({ ...current, page: Math.min(current.page, counterTotalPages) }));
   }, [counterTotalPages]);
 
-  function fillDroneForm(drone) {
+
+
+  const fillDroneForm = (drone) => {
     setEditingDroneId(drone._id);
     setDroneForm({
       name: drone.name,
       country: drone.country,
       type: drone.type,
       description: drone.description || '',
-      specs: {
-        price_usd: drone.specs?.price_usd || 0,
-        range_km: drone.specs?.range_km || 0,
-        endurance_hr: drone.specs?.endurance_hr || 0,
-        payload_kg: drone.specs?.payload_kg || 0,
-        speed_kmh: drone.specs?.speed_kmh || 0,
-        maintenance_cost_per_hr: drone.specs?.maintenance_cost_per_hr || 0,
-      },
+      specs: { ...drone.specs },
+      image: drone.image || '',
+      model_url: drone.model_url || '',
     });
-  }
+    setErrorMessage('');
+  };
 
   function fillCountryForm(country) {
     setEditingCountryId(country._id);
@@ -734,29 +736,65 @@ export default function AdminPanel() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <AdminSection title="Drone Registry">
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleDroneSubmit}>
-            <AdminInput label="Name" value={droneForm.name} onChange={(event) => setDroneForm({ ...droneForm, name: event.target.value })} required />
-            <AdminSelect label="Country" value={droneForm.country} onChange={(event) => setDroneForm({ ...droneForm, country: event.target.value })} required>
-              <option value="">Select country</option>
-              {countryOptions.map((country) => <option key={country} value={country}>{country}</option>)}
-            </AdminSelect>
-            <AdminSelect label="Type" value={droneForm.type} onChange={(event) => setDroneForm({ ...droneForm, type: event.target.value })}>
-              {droneTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-            </AdminSelect>
-            <AdminInput label="Price USD" type="number" value={droneForm.specs.price_usd} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, price_usd: event.target.value } })} required />
-            <AdminInput label="Range KM" type="number" value={droneForm.specs.range_km} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, range_km: event.target.value } })} required />
-            <AdminInput label="Endurance HR" type="number" step="0.1" value={droneForm.specs.endurance_hr} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, endurance_hr: event.target.value } })} required />
-            <AdminInput label="Payload KG" type="number" step="0.1" value={droneForm.specs.payload_kg} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, payload_kg: event.target.value } })} required />
-            <AdminInput label="Speed KMH" type="number" value={droneForm.specs.speed_kmh} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, speed_kmh: event.target.value } })} required />
-            <AdminInput label="Maintenance Cost HR" type="number" value={droneForm.specs.maintenance_cost_per_hr} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, maintenance_cost_per_hr: event.target.value } })} required />
-            <div className="md:col-span-2">
+          <form className="space-y-6 mb-8" onSubmit={handleDroneSubmit}>
+            {/* Basic Info */}
+            <div className="bg-black/20 p-5 rounded-xl border border-white/5 space-y-4 shadow-inner">
+              <h4 className="font-heading text-xs uppercase tracking-widest text-neon flex items-center gap-2 border-b border-white/5 pb-2"><Layout size={14} /> Basic Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <AdminInput label="Name" value={droneForm.name} onChange={(event) => setDroneForm({ ...droneForm, name: event.target.value })} required />
+                <AdminSelect label="Country" value={droneForm.country} onChange={(event) => setDroneForm({ ...droneForm, country: event.target.value })} required>
+                  <option value="">Select country</option>
+                  {countryOptions.map((country) => <option key={country} value={country}>{country}</option>)}
+                </AdminSelect>
+                <AdminSelect label="Type" value={droneForm.type} onChange={(event) => setDroneForm({ ...droneForm, type: event.target.value })}>
+                  {droneTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                </AdminSelect>
+              </div>
+            </div>
+
+            {/* Performance */}
+            <div className="bg-black/20 p-5 rounded-xl border border-white/5 space-y-4 shadow-inner">
+              <h4 className="font-heading text-xs uppercase tracking-widest text-neon flex items-center gap-2 border-b border-white/5 pb-2"><Activity size={14} /> Performance Specifications</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <AdminInput label="Price USD" type="number" value={droneForm.specs.price_usd} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, price_usd: event.target.value } })} required />
+                <AdminInput label="Range KM" type="number" value={droneForm.specs.range_km} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, range_km: event.target.value } })} required />
+                <AdminInput label="Endurance HR" type="number" step="0.1" value={droneForm.specs.endurance_hr} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, endurance_hr: event.target.value } })} required />
+                <AdminInput label="Payload KG" type="number" step="0.1" value={droneForm.specs.payload_kg} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, payload_kg: event.target.value } })} required />
+                <AdminInput label="Speed KMH" type="number" value={droneForm.specs.speed_kmh} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, speed_kmh: event.target.value } })} required />
+                <AdminInput label="Maintenance/Hr" type="number" value={droneForm.specs.maintenance_cost_per_hr} onChange={(event) => setDroneForm({ ...droneForm, specs: { ...droneForm.specs, maintenance_cost_per_hr: event.target.value } })} required />
+              </div>
+            </div>
+            
+            {/* Media */}
+            <div className="bg-black/20 p-5 rounded-xl border border-white/5 space-y-4 shadow-inner">
+              <h4 className="font-heading text-xs uppercase tracking-widest text-neon flex items-center gap-2 border-b border-white/5 pb-2"><Layers size={14} /> Intelligence Assets</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <AdminInput label="Image URL (Standardized)" value={droneForm.image} onChange={(event) => setDroneForm({ ...droneForm, image: event.target.value })} placeholder="/images/drones/model.jpg" />
+                <AdminInput label="3D Model URL (.glb)" value={droneForm.model_url} onChange={(event) => setDroneForm({ ...droneForm, model_url: event.target.value })} placeholder="/models/drone.glb" />
+              </div>
+            </div>
+            
+            {/* Description */}
+            <div className="bg-black/20 p-5 rounded-xl border border-white/5 space-y-4 shadow-inner">
+              <h4 className="font-heading text-xs uppercase tracking-widest text-neon flex items-center gap-2 border-b border-white/5 pb-2"><Brain size={14} /> Executive Description</h4>
               <AdminTextarea label="Description" value={droneForm.description} onChange={(event) => setDroneForm({ ...droneForm, description: event.target.value })} />
             </div>
-            <div className="md:col-span-2 flex gap-3">
-              <ActionButton type="submit" disabled={submitting.drone} className={submitting.drone ? 'opacity-60 cursor-not-allowed' : ''}>
-                {submitting.drone ? 'Saving...' : editingDroneId ? 'Update Drone' : 'Create Drone'}
+
+            {/* Live Card Preview */}
+            <div className="bg-black/30 p-5 rounded-xl border border-neon/20 shadow-[0_0_15px_rgba(0,255,255,0.05)]">
+              <h4 className="font-heading text-xs uppercase tracking-[0.2em] mb-4 text-neon flex items-center justify-center gap-2">
+                <Layout size={14} /> Global Registry Preview
+              </h4>
+              <div className="max-w-sm mx-auto">
+                 <DroneCard drone={droneForm} index={0} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-4">
+              <ActionButton type="button" variant="ghost" onClick={() => { setDroneForm(emptyDrone); setEditingDroneId(null); }}>Clear Form</ActionButton>
+              <ActionButton type="submit" disabled={submitting.drone} className={submitting.drone ? 'opacity-60 cursor-not-allowed' : 'bg-neon/10 border-neon hover:bg-neon hover:text-black'}>
+                {submitting.drone ? 'Saving...' : editingDroneId ? 'Update Platform' : 'Create Platform'}
               </ActionButton>
-              <ActionButton type="button" variant="ghost" onClick={() => { setDroneForm(emptyDrone); setEditingDroneId(null); }}>Clear</ActionButton>
             </div>
           </form>
           <TableControls

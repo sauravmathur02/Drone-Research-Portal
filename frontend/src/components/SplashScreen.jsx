@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Activity, Radar } from 'lucide-react';
+
+// Lazy-load the 3D background so it doesn't block the splash paint
+const DroneBackground3D = lazy(() => import('./DroneBackground3D'));
 
 export default function SplashScreen({ onEnter }) {
   return (
     <div className="min-h-screen bg-dark text-textMain relative overflow-hidden flex items-center justify-center px-6">
-      <div className="absolute inset-0 intro-grid opacity-50"></div>
-      <div className="absolute inset-0 intro-pulse"></div>
-      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-neon/10 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-danger/10 rounded-full blur-3xl"></div>
+      {/* 3D Drone Background — cinematic ambient layer */}
+      <Suspense fallback={null}>
+        <DroneBackground3D />
+      </Suspense>
+
+      <div className="absolute inset-0 intro-grid opacity-50" style={{ zIndex: 2 }}></div>
+      <div className="absolute inset-0 intro-pulse" style={{ zIndex: 2 }}></div>
+      <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-neon/10 rounded-full blur-3xl" style={{ zIndex: 2 }}></div>
+      <div className="absolute bottom-10 right-10 w-80 h-80 bg-danger/10 rounded-full blur-3xl" style={{ zIndex: 2 }}></div>
 
       <div className="relative z-10 max-w-3xl w-full glass-card intro-panel text-center">
         <div className="flex justify-center mb-6">
