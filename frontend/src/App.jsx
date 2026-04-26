@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Globe, Database, Scale, Shield, BrainCircuit, Activity, Settings2, Bell, Search, Flag, Crosshair, Menu, X, Bookmark } from 'lucide-react';
 import AIHome from './pages/AIHome';
 import GlobalCommand from './pages/GlobalCommand';
@@ -17,7 +17,7 @@ import SearchAssistant from './components/SearchAssistant';
 import SavedDrones from './pages/SavedDrones';
 
 const routeTitles = {
-  '/': 'Drone Intelligence Search',
+  '/search': 'Drone Intelligence Search',
   '/command': 'Tactical Overview',
   '/database': 'Drone Database',
   '/compare': 'Platform Comparison',
@@ -114,7 +114,7 @@ function AppShell() {
     navigate('/command');
   };
 
-  if (location.pathname === '/') {
+  if (location.pathname === '/search') {
     return <AIHome onOpenDashboard={handleOpenDashboard} />;
   }
 
@@ -152,7 +152,7 @@ function AppShell() {
           </button>
         </div>
         <ul className="flex-grow py-4 overflow-y-auto">
-          <SidebarLink to="/" icon={<Search size={18} />} label="AI Search" onClick={() => setSidebarOpen(false)} />
+          <SidebarLink to="/search" icon={<Search size={18} />} label="AI Search" onClick={() => setSidebarOpen(false)} />
           <SidebarLink to="/command" icon={<Globe size={18} />} label="Global Command" onClick={() => setSidebarOpen(false)} />
           <SidebarLink to="/database" icon={<Database size={18} />} label="Drone Database" onClick={() => setSidebarOpen(false)} />
           <SidebarLink to="/compare" icon={<Scale size={18} />} label="Comparison Tool" onClick={() => setSidebarOpen(false)} />
@@ -209,6 +209,7 @@ function AppShell() {
 
         <div className="p-4 md:p-6 pt-0 relative z-10 w-full h-full">
           <Routes>
+            <Route path="/" element={<Navigate to="/command" replace />} />
             <Route path="/command" element={<GlobalCommand />} />
             <Route path="/database" element={<DroneDatabase />} />
             <Route path="/saved" element={<SavedDrones />} />
