@@ -1,105 +1,62 @@
 const express = require('express');
 const router = express.Router();
+const apiController = require('../controllers/apiController');
+const updateStream = require('../utils/updateStream');
+const aiService = require('../services/aiService');
 const Drone = require('../models/Drone');
 const Update = require('../models/Update');
-const { calculateFlightPhysics } = require('../utils/simulation');
-const discoveryService = require('../services/newsUpdateService');
-const aiService = require('../services/aiService');
-const updateStream = require('../utils/updateStream');
 
-// 1. Get all drones with search, category, country, and sort filters
-router.get('/drones', async (req, res) => {
+// Optional existing controllers (gracefully wired if methods exist)
+let adminController = {};
+let historyController = {};
+let updateController = {};
+let requireAdminAuth = (req, res, next) => next();
+
+try { adminController = require('../controllers/adminController'); } catch (_) {}
+try { historyController = require('../controllers/historyController'); } catch (_) {}
+try { updateController = require('../controllers/updateController'); } catch (_) {}
+try { requireAdminAuth = require('../middleware/requireAdminAuth'); } catch (_) {}
+
+// --- DRONE ENCYCLOPEDIA & TACTICAL ROUTES ---
+router.get('/drones', apiController.getDrones);
+router.get('/drones/:id', apiController.getDroneById);
+
+// --- COUNTER-UAS & COUNTRY GEO-INTEL ROUTES ---
+router.get('/counter-systems', apiController.getCounterSystems);
+router.get('/countries', apiController.getCountries);
+
+// --- UAV EVOLUTION & HISTORY ROUTES ---
+router.get('/history', apiController.getHistory);
+if (historyController.getHistory) {
+  router.get('/user/history', historyController.getHistory);
+}
+
+// --- SIMULATION & ACADEMIC PHYSICS LAB ROUTES ---
+router.post('/simulate', apiController.runSimulation);
+router.post('/academic/simulate', apiController.runSimulation);
+
+// --- REAL-TIME SSE STREAM & AUTOMATED DISCOVERY ROUTES ---
+router.get('/updates/stream', (req, res) => updateStream.addClient(req, res));
+router.get('/updates', updateController.getUpdates || (async (req, res) => {
   try {
-    const { search, category, country, source, sort = '-introducedYear' } = req.query;
-    const filter = {};
-
-    if (category && category !== 'All') filter.category = category;
-    if (country && country !== 'All') filter.country = country;
-    if (source && source !== 'All') filter['automationMeta.source'] = source;
-    if (search) {
-      filter.$or = [
-        { name: new RegExp(search, 'i') },
-        { manufacturer: new RegExp(search, 'i') },
-        { country: new RegExp(search, 'i') },
-        { role: new RegExp(search, 'i') },
-        { description: new RegExp(search, 'i') }
-      ];
-    }
-
-    const drones = await Drone.find(filter).sort(sort).limit(200);
-    const stats = {
-      totalDrones: await Drone.countDocuments(),
-      autoDiscoveredCount: await Drone.countDocuments({ 'automationMeta.source': { $ne: 'Manual' } }),
-      countriesCount: (await Drone.distinct('country')).length
-    };
-
-    res.json({ drones, stats });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 2. Real-time Server-Sent Events (SSE) stream for live auto-discovered drones
-router.get('/updates/stream', (req, res) => {
-  updateStream.addClient(req, res);
-});
-
-// 3. Get recent automated discovery & news updates
-router.get('/updates', async (req, res) => {
-  try {
-    const updates = await Update.find().populate('relatedDrone', 'name country category image').sort('-createdAt').limit(30);
+    const updates = await Update.find().populate('relatedDrone', 'name country category image').sort('-createdAt').limit(40);
     res.json({ updates });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}));
+router.post('/automation/sync', apiController.triggerAutomationSync);
 
-// 4. Trigger Automated Discovery Pipeline (Wikidata Sync + Live RSS AI Scan)
-router.post('/automation/sync', async (req, res) => {
-  try {
-    const { mode = 'both' } = req.body;
-    const results = {};
-
-    if (mode === 'wikidata' || mode === 'both') {
-      results.wikidata = await discoveryService.syncFromWikidata(40);
-    }
-    if (mode === 'news' || mode === 'both') {
-      results.news = await discoveryService.scanNewsForNewDrones();
-    }
-
-    res.json({
-      message: 'Automated drone discovery sync completed.',
-      results
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 5. Academic UAV Flight Physics & Endurance Simulator
-router.post('/academic/simulate', (req, res) => {
-  try {
-    const result = calculateFlightPhysics(req.body);
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// 6. AI Academic Research Tutor Q&A
+// --- HYBRID AI & ACADEMIC PROFESSOR Q&A ---
 router.post('/ai/ask', async (req, res) => {
   try {
     const { question } = req.body;
     if (!question) return res.status(400).json({ error: 'Question is required' });
 
-    const keywords = question
-      .split(/\s+/)
-      .filter((w) => w.length > 2)
-      .join('|');
-
+    const keywords = question.split(/\s+/).filter((w) => w.length > 2).join('|');
     const relevantDrones = keywords
-      ? await Drone.find({ searchText: new RegExp(keywords, 'i') }).limit(5)
-      : await Drone.find().limit(5);
+      ? await Drone.find({ searchText: new RegExp(keywords, 'i') }).limit(6)
+      : await Drone.find().limit(6);
 
     const response = await aiService.askAcademicTutor(question, relevantDrones);
     res.json(response);
@@ -107,5 +64,16 @@ router.post('/ai/ask', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// --- ADMIN MANAGEMENT ROUTES ---
+if (adminController.createDrone) {
+  router.post('/admin/drones', requireAdminAuth, adminController.createDrone);
+}
+if (adminController.updateDrone) {
+  router.put('/admin/drones/:id', requireAdminAuth, adminController.updateDrone);
+}
+if (adminController.deleteDrone) {
+  router.delete('/admin/drones/:id', requireAdminAuth, adminController.deleteDrone);
+}
 
 module.exports = router;

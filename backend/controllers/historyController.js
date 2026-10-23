@@ -2,6 +2,9 @@ const History = require('../models/History');
 
 exports.getHistory = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: 'Authentication required for user history.' });
+    }
     const history = await History.find({ user_id: req.user._id })
       .sort({ timestamp: 1 })
       .lean();

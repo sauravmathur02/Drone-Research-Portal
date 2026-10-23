@@ -1,223 +1,249 @@
 const Drone = require('../models/Drone');
-const Country = require('../models/Country');
 const CounterSystem = require('../models/CounterSystem');
+const Country = require('../models/Country');
+const History = require('../models/History');
+const Update = require('../models/Update');
+const simulationUtil = require('../utils/simulation');
+const discoveryService = require('../services/newsUpdateService');
 
-const EFFECTIVENESS_SCORES = {
-  High: 40,
-  Medium: 25,
-  Low: 10,
-};
+let tfidfSearch = null;
+try {
+  tfidfSearch = require('../utils/droneTfidfSearch');
+} catch (_) {}
 
-const ATTACK_TYPE_WEIGHTS = {
-  Swarm: 3.2,
-  Tactical: 2.1,
-  MALE: 2.6,
-  HALE: 3,
-  Loitering: 2.4,
-  Nano: 1.5,
-};
-
-function handleServerError(res, error) {
-  res.status(500).json({ error: error.message });
-}
-
-function buildCrudHandlers(Model, entityName) {
-  const displayName = entityName.toLowerCase();
-
-  return {
-    async create(req, res) {
-      try {
-        const document = await Model.create(req.body);
-        res.status(201).json(document);
-      } catch (error) {
-        res.status(400).json({ error: `Failed to create ${displayName}.`, details: error.message });
-      }
-    },
-    async update(req, res) {
-      try {
-        const document = await Model.findByIdAndUpdate(req.params.id, req.body, {
-          new: true,
-          runValidators: true,
-        });
-
-        if (!document) {
-          return res.status(404).json({ error: `${entityName} not found.` });
-        }
-
-        res.json(document);
-      } catch (error) {
-        res.status(400).json({ error: `Failed to update ${displayName}.`, details: error.message });
-      }
-    },
-    async remove(req, res) {
-      try {
-        const document = await Model.findByIdAndDelete(req.params.id);
-
-        if (!document) {
-          return res.status(404).json({ error: `${entityName} not found.` });
-        }
-
-        res.json({ message: `${entityName} deleted successfully.` });
-      } catch (error) {
-        handleServerError(res, error);
-      }
-    },
-  };
-}
-
-function buildThreatLevel(successProbability) {
-  if (successProbability >= 65) {
-    return 'LOW';
-  }
-
-  if (successProbability >= 35) {
-    return 'MEDIUM';
-  }
-
-  return 'HIGH';
-}
-
-function buildThreatLevelFromScore(threatScore) {
-  if (threatScore >= 75) {
-    return 'HIGH';
-  }
-
-  if (threatScore >= 40) {
-    return 'MEDIUM';
-  }
-
-  return 'LOW';
-}
-
-exports.getCountries = async (req, res) => {
-  try {
-    const countries = await Country.find().sort({ drone_count: -1, name: 1 });
-    res.json(countries);
-  } catch (error) {
-    handleServerError(res, error);
-  }
-};
-
+// 1. GET /api/drones (Supports TF-IDF ranking, theoretical filter, country, category)
 exports.getDrones = async (req, res) => {
   try {
-    const filters = {};
+    const { search, category, country, status, isTheoretical, source, sort = '-introducedYear' } = req.query;
+    const filter = {};
 
-    if (req.query.type) {
-      filters.type = req.query.type;
+    if (category && category !== 'All') {
+      filter.$or = [{ category }, { type: category }];
+    }
+    if (country && country !== 'All') {
+      filter.$or = [{ country }, { origin: country }];
+    }
+    if (status && status !== 'All') filter.status = status;
+    if (isTheoretical !== undefined && isTheoretical !== 'All') {
+      filter.isTheoretical = isTheoretical === 'true';
+    }
+    if (source && source !== 'All') {
+      filter['automationMeta.source'] = source;
     }
 
-    if (req.query.country) {
-      filters.country = req.query.country;
+    let drones = await Drone.find(filter).sort(sort).lean();
+
+    // Use your repo's TF-IDF Search Engine when a search query is provided
+    if (search && search.trim()) {
+      if (tfidfSearch && typeof tfidfSearch.searchDrones === 'function') {
+        const ranked = await tfidfSearch.searchDrones(search.trim(), drones);
+        if (Array.isArray(ranked) && ranked.length > 0) {
+          drones = ranked;
+        }
+      } else {
+        const regex = new RegExp(search.trim(), 'i');
+        drones = drones.filter(
+          (d) =>
+            regex.test(d.name) ||
+            regex.test(d.manufacturer) ||
+            regex.test(d.country) ||
+            regex.test(d.role) ||
+            regex.test(d.description) ||
+            regex.test(d.searchText)
+        );
+      }
     }
 
-    if (req.query.search) {
-      const q = new RegExp(req.query.search, 'i');
-      filters.$or = [{ name: q }, { country: q }];
-    }
-
-    const drones = await Drone.find(filters).sort({ name: 1 });
-    res.json(drones);
-  } catch (error) {
-    handleServerError(res, error);
-  }
-};
-
-exports.getCounterSystems = async (req, res) => {
-  try {
-    const systems = await CounterSystem.find().sort({ name: 1 });
-    res.json(systems);
-  } catch (error) {
-    handleServerError(res, error);
-  }
-};
-
-exports.simulateWhatIf = async (req, res) => {
-  try {
-    const { country, attack_type } = req.body;
-
-    if (!country || !attack_type) {
-      return res.status(400).json({ error: 'country and attack_type are required.' });
-    }
-
-    const selectedCountry = await Country.findOne({
-      $or: [{ code: country }, { name: country }],
-    });
-    const growthRate = selectedCountry?.growth_rate || 0;
-    const attackWeight = ATTACK_TYPE_WEIGHTS[attack_type] || 1.5;
-    const threatScore = Number((growthRate * attackWeight).toFixed(1));
-
-    const availableCounters = await CounterSystem.find({
-      effective_against: attack_type,
-    }).sort({ name: 1 });
-
-    const rankedCounters = [...availableCounters].sort(
-      (left, right) =>
-        (EFFECTIVENESS_SCORES[right.effectiveness] || 0) -
-        (EFFECTIVENESS_SCORES[left.effectiveness] || 0)
-    );
-
-    const successProbability = Math.min(
-      rankedCounters.reduce(
-        (total, counterSystem) => total + (EFFECTIVENESS_SCORES[counterSystem.effectiveness] || 0),
-        0
-      ),
-      90
-    );
-    const adjustedSuccessProbability = Math.max(
-      Math.min(Math.round(successProbability - threatScore / 8), 90),
-      rankedCounters.length ? 10 : 0
-    );
-    const threatLevel = buildThreatLevelFromScore(threatScore);
-
-    const countryAnalysis = selectedCountry
-      ? `${selectedCountry.name} specializes in ${selectedCountry.specialization} and fields approximately ${selectedCountry.drone_count.toLocaleString()} drones.`
-      : 'Country-specific force posture was unavailable, so the engine used the baseline threat model.';
-    const reasoning = selectedCountry
-      ? `${selectedCountry.name} has a ${growthRate}% growth rate and ${attack_type} carries a ${attackWeight} threat weight, creating a threat score of ${threatScore}.`
-      : `Threat reasoning used the default attack weight of ${attackWeight} because country growth data was unavailable.`;
-
-    if (rankedCounters.length === 0) {
-      return res.json({
-        threat_level: threatLevel,
-        threat_score: threatScore,
-        recommended_counters: [],
-        success_probability: '0%',
-        reasoning,
-        analysis: `${countryAnalysis} No counter systems in the current database are mapped to ${attack_type} threats yet.`,
-      });
-    }
+    const [totalDrones, autoDiscoveredCount, countriesList, counterSystemsCount, theoreticalCount] =
+      await Promise.all([
+        Drone.countDocuments(),
+        Drone.countDocuments({ 'automationMeta.source': { $nin: ['Manual', 'Seed-Core'] } }),
+        Drone.distinct('country'),
+        CounterSystem.countDocuments().catch(() => 0),
+        Drone.countDocuments({ isTheoretical: true })
+      ]);
 
     res.json({
-      threat_level: threatLevel,
-      threat_score: threatScore,
-      recommended_counters: rankedCounters
-        .slice(0, 3)
-        .map((counterSystem) => `${counterSystem.name} (${counterSystem.type})`),
-      success_probability: `${adjustedSuccessProbability}%`,
-      reasoning,
-      defense_confidence: buildThreatLevel(successProbability),
-      analysis: `${countryAnalysis} These counters are recommended because ${rankedCounters
-        .slice(0, 3)
-        .map((counterSystem) => counterSystem.description)
-        .join(' ')} This model lowered defensive confidence against a ${threatLevel.toLowerCase()} threat score.`,
+      drones,
+      stats: {
+        totalDrones,
+        autoDiscoveredCount,
+        countriesCount: countriesList.length,
+        counterSystemsCount,
+        theoreticalCount
+      }
     });
-  } catch (error) {
-    handleServerError(res, error);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
-const droneCrud = buildCrudHandlers(Drone, 'Drone');
-const countryCrud = buildCrudHandlers(Country, 'Country');
-const counterCrud = buildCrudHandlers(CounterSystem, 'Counter system');
+// 2. GET /api/drones/:id
+exports.getDroneById = async (req, res) => {
+  try {
+    const drone = await Drone.findOne({
+      $or: [
+        ...(req.params.id.match(/^[0-9a-fA-F]{24}$/) ? [{ _id: req.params.id }] : []),
+        { slug: req.params.id.toLowerCase() },
+        { name: new RegExp(`^${req.params.id}$`, 'i') }
+      ]
+    });
+    if (!drone) return res.status(404).json({ error: 'Drone not found' });
+    res.json(drone);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
-exports.createDrone = droneCrud.create;
-exports.updateDrone = droneCrud.update;
-exports.deleteDrone = droneCrud.remove;
+// 3. GET /api/counter-systems (Restores CounterSystem.js + public/counter/ images)
+exports.getCounterSystems = async (req, res) => {
+  try {
+    const systems = await CounterSystem.find().sort('name').lean();
+    res.json({ counterSystems: systems });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
-exports.createCountry = countryCrud.create;
-exports.updateCountry = countryCrud.update;
-exports.deleteCountry = countryCrud.remove;
+// 4. GET /api/countries (Restores Country.js + seedBases.js geo-intelligence)
+exports.getCountries = async (req, res) => {
+  try {
+    const countries = await Country.find().sort('name').lean();
+    res.json({ countries });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
 
-exports.createCounterSystem = counterCrud.create;
-exports.updateCounterSystem = counterCrud.update;
-exports.deleteCounterSystem = counterCrud.remove;
+// 5. GET /api/history (Restores History.js timeline)
+exports.getHistory = async (req, res) => {
+  try {
+    const events = await History.find({ year: { $exists: true } }).sort('year').lean();
+    res.json({ history: events });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// 6. POST /api/simulate (Supports both Tactical Counter-UAS Engagement & Academic Flight Physics)
+exports.runSimulation = async (req, res) => {
+  try {
+    const { mode = 'flight_physics', droneId, counterSystemId, weather, terrain, ...physicsParams } = req.body;
+
+    if (mode === 'engagement' && droneId && counterSystemId) {
+      const [drone, counter] = await Promise.all([
+        Drone.findById(droneId).lean(),
+        CounterSystem.findById(counterSystemId).lean()
+      ]);
+      const result = simulationUtil.simulateEngagement(drone, counter, { weather, terrain });
+      return res.json(result);
+    }
+
+    const physicsResult = simulationUtil.calculateFlightPhysics(physicsParams);
+    res.json(physicsResult);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// 7. POST /api/automation/sync (Triggers Wikidata + ArXiv Academic + Global RSS Drone Discovery)
+exports.triggerAutomationSync = async (req, res) => {
+  try {
+    const { mode = 'all' } = req.body;
+    const results = await discoveryService.runFullDiscoveryPipeline(mode);
+    res.json({
+      message: 'Automated multi-source drone discovery pipeline executed.',
+      results
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// --- CRUD Handlers for Admin Panel & Management ---
+exports.createDrone = async (req, res) => {
+  try {
+    const drone = await Drone.create(req.body);
+    res.status(201).json(drone);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.updateDrone = async (req, res) => {
+  try {
+    const drone = await Drone.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!drone) return res.status(404).json({ error: 'Drone not found' });
+    res.json(drone);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.deleteDrone = async (req, res) => {
+  try {
+    const drone = await Drone.findByIdAndDelete(req.params.id);
+    if (!drone) return res.status(404).json({ error: 'Drone not found' });
+    res.json({ message: 'Drone deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.createCountry = async (req, res) => {
+  try {
+    const country = await Country.create(req.body);
+    res.status(201).json(country);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.updateCountry = async (req, res) => {
+  try {
+    const country = await Country.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!country) return res.status(404).json({ error: 'Country not found' });
+    res.json(country);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.deleteCountry = async (req, res) => {
+  try {
+    const country = await Country.findByIdAndDelete(req.params.id);
+    if (!country) return res.status(404).json({ error: 'Country not found' });
+    res.json({ message: 'Country deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.createCounterSystem = async (req, res) => {
+  try {
+    const system = await CounterSystem.create(req.body);
+    res.status(201).json(system);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.updateCounterSystem = async (req, res) => {
+  try {
+    const system = await CounterSystem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!system) return res.status(404).json({ error: 'Counter system not found' });
+    res.json(system);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.deleteCounterSystem = async (req, res) => {
+  try {
+    const system = await CounterSystem.findByIdAndDelete(req.params.id);
+    if (!system) return res.status(404).json({ error: 'Counter system not found' });
+    res.json({ message: 'Counter system deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
