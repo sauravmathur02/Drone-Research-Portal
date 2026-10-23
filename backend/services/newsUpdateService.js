@@ -1,335 +1,217 @@
+const Parser = require('rss-parser');
+const axios = require('axios');
+const cron = require('node-cron');
+const Drone = require('../models/Drone');
 const Update = require('../models/Update');
-const { broadcastUpdate } = require('../utils/updateStream');
+const aiService = require('./aiService');
+const updateStream = require('../utils/updateStream');
 
-const DRONE_QUERY = '("drone" OR "uav" OR "counter-drone" OR "drone swarm" OR "loitering munition")';
-const GOOGLE_NEWS_RSS_URL = `https://news.google.com/rss/search?q=${encodeURIComponent(DRONE_QUERY)}&hl=en-US&gl=US&ceid=US:en`;
-const NEWS_REFRESH_INTERVAL_MS = Number(process.env.NEWS_REFRESH_INTERVAL_MS || 120000);
-const COUNTRY_KEYWORDS = {
-  USA: ['united states', 'u.s.', 'us ', 'u.s. ', 'american'],
-  CHN: ['china', 'chinese'],
-  RUS: ['russia', 'russian'],
-  IND: ['india', 'indian'],
-  ISR: ['israel', 'israeli'],
-  UKR: ['ukraine', 'ukrainian'],
-  GBR: ['britain', 'british', 'uk '],
-  IRN: ['iran', 'iranian'],
-  TUR: ['turkey', 'turkish'],
-};
+const parser = new Parser({ timeout: 10000 });
 
-let serviceStarted = false;
+const DRONE_RSS_FEEDS = [
+  'https://dronedj.com/feed/',
+  'https://www.unmannedairspace.info/feed/',
+  'https://dronelife.com/feed/'
+];
 
-function decodeHtml(value = '') {
-  return value
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/');
-}
-
-function stripTags(value = '') {
-  return decodeHtml(value).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-}
-
-function extractTagValue(itemXml, tagName) {
-  const match = itemXml.match(new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i'));
-  return match ? stripTags(match[1]) : '';
-}
-
-function extractSource(itemXml) {
-  const sourceMatch = itemXml.match(/<source(?:\s+url="([^"]*)")?>([\s\S]*?)<\/source>/i);
-
-  if (!sourceMatch) {
-    return { source: '', sourceUrl: '' };
+class AutomatedDroneDiscoveryService {
+  constructor() {
+    this.isRunning = false;
   }
 
-  return {
-    source: stripTags(sourceMatch[2]),
-    sourceUrl: decodeHtml(sourceMatch[1] || ''),
-  };
-}
+  /**
+   * 1. Syncs existing & newly cataloged drones from Wikidata SPARQL endpoint (Class: Q484000 UAV)
+   */
+  async syncFromWikidata(limit = 50) {
+    const sparqlQuery = `
+      SELECT ?uav ?uavLabel ?uavDescription ?countryLabel ?manufacturerLabel ?inception ?mass ?wingspan WHERE {
+        ?uav wdt:P31/wdt:P279* wd:Q484000.
+        OPTIONAL { ?uav wdt:P495 ?country. }
+        OPTIONAL { ?uav wdt:P176 ?manufacturer. }
+        OPTIONAL { ?uav wdt:P571 ?inception. }
+        OPTIONAL { ?uav wdt:P2067 ?mass. }
+        OPTIONAL { ?uav wdt:P2050 ?wingspan. }
+        SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+      }
+      LIMIT ${limit}
+    `;
 
-function extractItemsFromRss(xml) {
-  const matches = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
-  return matches.map((itemXml) => {
-    const { source, sourceUrl } = extractSource(itemXml);
-    return {
-      title: extractTagValue(itemXml, 'title'),
-      link: extractTagValue(itemXml, 'link'),
-      externalId: extractTagValue(itemXml, 'guid') || extractTagValue(itemXml, 'link'),
-      publishedAt: extractTagValue(itemXml, 'pubDate'),
-      description: extractTagValue(itemXml, 'description'),
-      source,
-      sourceUrl,
-      provider: 'google-news-rss',
-    };
-  });
-}
-
-function resolveSeverityFromText(text) {
-  const normalizedText = text.toLowerCase();
-
-  if (/(attack|strike|war|missile|combat|killed|warning|loss)/.test(normalizedText)) {
-    return 'High';
-  }
-
-  if (/(test|trial|drill|exercise|prototype|demo|rehears)/.test(normalizedText)) {
-    return 'Medium';
-  }
-
-  if (/(launch|unveil|funding|deal|contract|package|delivery|acquire|expands)/.test(normalizedText)) {
-    return 'Low';
-  }
-
-  return 'Medium';
-}
-
-function resolveCategoryFromText(text) {
-  const normalizedText = text.toLowerCase();
-
-  if (/(counter-drone|laser|jamming|shield|defense)/.test(normalizedText)) {
-    return 'Counter-UAS';
-  }
-
-  if (/(swarm|massive|coordinated)/.test(normalizedText)) {
-    return 'Swarm Activity';
-  }
-
-  if (/(test|trial|drill|exercise|prototype|demo)/.test(normalizedText)) {
-    return 'Testing & Trials';
-  }
-
-  if (/(deal|contract|package|funding|acquire)/.test(normalizedText)) {
-    return 'Industry & Procurement';
-  }
-
-  if (/(launch|flight|sortie|deploy)/.test(normalizedText)) {
-    return 'Launch & Deployment';
-  }
-
-  return 'Drone Intelligence';
-}
-
-function resolveCountryFromText(text) {
-  const normalizedText = text.toLowerCase();
-
-  for (const [countryCode, keywords] of Object.entries(COUNTRY_KEYWORDS)) {
-    if (keywords.some((keyword) => normalizedText.includes(keyword))) {
-      return countryCode;
-    }
-  }
-
-  return 'GLOBAL';
-}
-
-function buildSummary(article) {
-  const text = `${article.title} ${article.description || ''}`;
-  const normalizedText = text.toLowerCase();
-
-  if (/(attack|strike|combat|warning|loss)/.test(normalizedText)) {
-    return 'Recent reporting points to heightened operational risk and more immediate military significance in the drone domain.';
-  }
-
-  if (/(test|trial|drill|exercise|prototype|demo)/.test(normalizedText)) {
-    return 'Recent reporting suggests capability validation or readiness improvement rather than direct battlefield escalation.';
-  }
-
-  if (/(deal|contract|funding|acquire|package)/.test(normalizedText)) {
-    return 'Recent reporting indicates procurement or investment momentum that can strengthen future drone capability.';
-  }
-
-  if (/(launch|deploy|flight|sortie)/.test(normalizedText)) {
-    return 'Recent reporting highlights active deployment or expansion of operational drone reach.';
-  }
-
-  return 'Recent reporting shows notable movement in drone technology, operations, or policy relevant to the monitoring feed.';
-}
-
-async function fetchFromNewsApi() {
-  if (!process.env.NEWS_API_KEY) {
-    return [];
-  }
-
-  const url = new URL('https://newsapi.org/v2/everything');
-  url.searchParams.set('q', 'drone OR UAV OR "counter-drone" OR "drone swarm"');
-  url.searchParams.set('language', 'en');
-  url.searchParams.set('sortBy', 'publishedAt');
-  url.searchParams.set('pageSize', '20');
-
-  const response = await fetch(url, {
-    headers: {
-      'X-Api-Key': process.env.NEWS_API_KEY,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`NewsAPI request failed with ${response.status}.`);
-  }
-
-  const data = await response.json();
-
-  return (data.articles || []).map((article) => ({
-    title: article.title || '',
-    link: article.url || '',
-    externalId: article.url || article.title || '',
-    publishedAt: article.publishedAt,
-    description: article.description || article.content || '',
-    source: article.source?.name || 'NewsAPI',
-    sourceUrl: '',
-    provider: 'newsapi',
-  }));
-}
-
-async function fetchFromGNews() {
-  if (!process.env.GNEWS_API_KEY) {
-    return [];
-  }
-
-  const url = new URL('https://gnews.io/api/v4/search');
-  url.searchParams.set('q', 'drone OR UAV OR "counter-drone" OR "drone swarm"');
-  url.searchParams.set('lang', 'en');
-  url.searchParams.set('max', '20');
-  url.searchParams.set('apikey', process.env.GNEWS_API_KEY);
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`GNews request failed with ${response.status}.`);
-  }
-
-  const data = await response.json();
-
-  return (data.articles || []).map((article) => ({
-    title: article.title || '',
-    link: article.url || '',
-    externalId: article.url || article.title || '',
-    publishedAt: article.publishedAt,
-    description: article.description || article.content || '',
-    source: article.source?.name || 'GNews',
-    sourceUrl: article.source?.url || '',
-    provider: 'gnews',
-  }));
-}
-
-async function fetchFromGoogleNewsRss() {
-  const response = await fetch(GOOGLE_NEWS_RSS_URL, {
-    headers: {
-      'User-Agent': 'DroneScope-AI/1.0',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google News RSS request failed with ${response.status}.`);
-  }
-
-  const xml = await response.text();
-  return extractItemsFromRss(xml);
-}
-
-async function fetchLiveArticles() {
-  try {
-    const articles = await fetchFromNewsApi();
-    if (articles.length) {
-      return articles;
-    }
-  } catch (error) {
-    console.error('NewsAPI fetch failed:', error.message);
-  }
-
-  try {
-    const articles = await fetchFromGNews();
-    if (articles.length) {
-      return articles;
-    }
-  } catch (error) {
-    console.error('GNews fetch failed:', error.message);
-  }
-
-  return fetchFromGoogleNewsRss();
-}
-
-function normalizeArticleToUpdate(article) {
-  const combinedText = `${article.title} ${article.description || ''}`;
-  const country = resolveCountryFromText(combinedText);
-
-  return {
-    title: article.title.trim(),
-    source: article.source || 'Live News Feed',
-    summary: buildSummary(article),
-    timestamp: article.publishedAt ? new Date(article.publishedAt) : new Date(),
-    severity: resolveSeverityFromText(combinedText),
-    country,
-    category: resolveCategoryFromText(combinedText),
-    link: article.link || article.sourceUrl || '',
-    external_id: article.externalId || article.link || article.title,
-    provider: article.provider || 'live-news',
-    ingested_at: new Date(),
-  };
-}
-
-async function cleanupLegacySimulatedUpdates() {
-  await Update.deleteMany({ provider: { $in: ['', null] } });
-}
-
-async function trimOldUpdates() {
-  const staleUpdates = await Update.find().sort({ timestamp: -1 }).skip(120);
-
-  if (staleUpdates.length) {
-    await Update.deleteMany({ _id: { $in: staleUpdates.map((item) => item._id) } });
-  }
-}
-
-async function ingestLatestNews() {
-  const articles = await fetchLiveArticles();
-  const normalizedArticles = articles
-    .map(normalizeArticleToUpdate)
-    .filter((article) => article.title && article.external_id);
-
-  const existingIds = new Set(
-    (
-      await Update.find({ external_id: { $in: normalizedArticles.map((item) => item.external_id) } })
-        .select('external_id')
-        .lean()
-    ).map((item) => item.external_id)
-  );
-
-  const freshArticles = normalizedArticles.filter((article) => !existingIds.has(article.external_id));
-
-  for (const article of freshArticles) {
-    const created = await Update.create(article);
-    broadcastUpdate(created);
-  }
-
-  await trimOldUpdates();
-}
-
-function scheduleNextIngestion() {
-  setTimeout(async () => {
     try {
-      await ingestLatestNews();
-    } catch (error) {
-      console.error('Failed to ingest live drone news:', error);
-    } finally {
-      scheduleNextIngestion();
-    }
-  }, NEWS_REFRESH_INTERVAL_MS).unref();
-}
+      const response = await axios.get('https://query.wikidata.org/sparql', {
+        params: { query: sparqlQuery, format: 'json' },
+        headers: { 'User-Agent': 'DroneResearchPortal/2.0 (Academic Research Project)' },
+        timeout: 15000
+      });
 
-async function startLiveNewsUpdates() {
-  if (serviceStarted) {
-    return;
+      const bindings = response.data?.results?.bindings || [];
+      let addedCount = 0;
+
+      for (const item of bindings) {
+        const name = item.uavLabel?.value;
+        // Skip unnamed Q-IDs
+        if (!name || /^Q\d+$/.test(name)) continue;
+
+        const wikidataId = item.uav?.value?.split('/').pop();
+        const country = item.countryLabel?.value || 'International';
+        const manufacturer = item.manufacturerLabel?.value || 'Aerospace Research Institute';
+        const year = item.inception?.value ? new Date(item.inception.value).getFullYear() : 2020;
+        const description =
+          item.uavDescription?.value ||
+          `${name} is an unmanned aerial vehicle developed by ${manufacturer} (${country}).`;
+
+        const existing = await Drone.findOne({
+          $or: [{ name: new RegExp(`^${name}$`, 'i') }, { 'automationMeta.wikidataId': wikidataId }]
+        });
+
+        if (!existing) {
+          const newDrone = await Drone.create({
+            name,
+            manufacturer,
+            country,
+            category: 'Experimental',
+            role: 'Unmanned Aerial System',
+            introducedYear: isNaN(year) ? 2022 : year,
+            status: 'Active',
+            image: '/drones/default.jpg',
+            specifications: {
+              maxTakeoffWeightKg: item.mass?.value ? Number(item.mass.value) : 50,
+              wingspanOrDiameterM: item.wingspan?.value ? Number(item.wingspan.value) : 4.5,
+              propulsionType: 'Electric Brushless',
+              autonomyLevel: 'GPS Waypoint'
+            },
+            academicNotes: {
+              aerodynamicProfile: 'Standard UAV aerodynamic configuration',
+              controlArchitecture: 'Closed-loop autopilot with telemetry downlink',
+              sensorSuite: ['GNSS', 'IMU', 'Optical Camera'],
+              learningTakeaways: ['Cataloged via automated Wikidata aerospace registry sync']
+            },
+            description,
+            automationMeta: {
+              source: 'Wikidata-Sync',
+              wikidataId,
+              sourceUrl: item.uav?.value,
+              confidenceScore: 0.95,
+              verified: true
+            }
+          });
+
+          addedCount++;
+          updateStream.broadcast('NEW_DRONE_DISCOVERED', newDrone);
+        }
+      }
+
+      return { success: true, addedCount, scanned: bindings.length };
+    } catch (error) {
+      console.error('[WikidataSync] Error:', error.message);
+      return { success: false, error: error.message };
+    }
   }
 
-  serviceStarted = true;
-  await cleanupLegacySimulatedUpdates();
-  await ingestLatestNews();
-  scheduleNextIngestion();
+  /**
+   * 2. Scans live RSS news feeds and uses AI extraction to automatically add newly unveiled drones
+   */
+  async scanNewsForNewDrones() {
+    if (this.isRunning) return { status: 'already_running' };
+    this.isRunning = true;
+    let newlyAddedDrones = [];
+
+    try {
+      for (const feedUrl of DRONE_RSS_FEEDS) {
+        try {
+          const feed = await parser.parseURL(feedUrl);
+          const recentItems = (feed.items || []).slice(0, 5);
+
+          for (const item of recentItems) {
+            // Check if article was already processed
+            const existingUpdate = await Update.findOne({ sourceUrl: item.link });
+            if (existingUpdate) continue;
+
+            const extracted = await aiService.extractDroneFromArticle(item);
+
+            if (extracted && extracted.isDrone && extracted.name && extracted.confidenceScore >= 0.6) {
+              let drone = await Drone.findOne({
+                name: new RegExp(`^${extracted.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i')
+              });
+
+              if (!drone) {
+                drone = await Drone.create({
+                  name: extracted.name,
+                  manufacturer: extracted.manufacturer || 'Emerging UAV Developer',
+                  country: extracted.country || 'International',
+                  category: extracted.category || 'Experimental',
+                  role: extracted.role || 'Autonomous Aerial Platform',
+                  introducedYear: extracted.introducedYear || new Date().getFullYear(),
+                  status: extracted.status || 'Prototype',
+                  image: '/drones/default.jpg',
+                  specifications: {
+                    maxSpeedKmh: extracted.specifications?.maxSpeedKmh || 0,
+                    rangeKm: extracted.specifications?.rangeKm || 0,
+                    enduranceHours: extracted.specifications?.enduranceHours || 0,
+                    maxTakeoffWeightKg: extracted.specifications?.maxTakeoffWeightKg || 0,
+                    payloadCapacityKg: extracted.specifications?.payloadCapacityKg || 0,
+                    propulsionType: extracted.specifications?.propulsionType || 'Electric Brushless'
+                  },
+                  academicNotes: extracted.academicNotes || {
+                    aerodynamicProfile: 'Newly announced airframe',
+                    controlArchitecture: 'Modern autonomous flight controller',
+                    sensorSuite: ['Onboard Telemetry'],
+                    learningTakeaways: ['Discovered automatically via live RSS + AI ingestion']
+                  },
+                  description: extracted.description || item.contentSnippet || item.title,
+                  automationMeta: {
+                    source: 'AI-News-Discovery',
+                    sourceUrl: item.link,
+                    confidenceScore: extracted.confidenceScore,
+                    verified: extracted.confidenceScore >= 0.85
+                  }
+                });
+
+                newlyAddedDrones.push(drone);
+                updateStream.broadcast('NEW_DRONE_DISCOVERED', drone);
+              }
+
+              // Log the update event in Update model
+              const updateDoc = await Update.create({
+                title: item.title,
+                summary: extracted.description || item.contentSnippet || '',
+                sourceUrl: item.link,
+                sourceName: feed.title || 'UAV News Feed',
+                relatedDrone: drone._id,
+                publishedAt: item.pubDate ? new Date(item.pubDate) : new Date()
+              });
+
+              updateStream.broadcast('NEWS_UPDATE', updateDoc);
+            }
+          }
+        } catch (feedErr) {
+          console.warn(`[NewsScanner] Failed to parse feed ${feedUrl}:`, feedErr.message);
+        }
+      }
+
+      return { success: true, newDronesCount: newlyAddedDrones.length, newDrones: newlyAddedDrones };
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  /**
+   * 3. Starts automated background cron jobs (every 6 hours)
+   */
+  startCronJobs() {
+    // Run News & New Drone Discovery every 6 hours
+    cron.schedule('0 */6 * * *', async () => {
+      console.log('[Cron] Running automated new drone news discovery...');
+      await this.scanNewsForNewDrones();
+    });
+
+    // Run Wikidata Global Registry Sync once daily at 02:00 AM
+    cron.schedule('0 2 * * *', async () => {
+      console.log('[Cron] Running daily Wikidata global drone registry sync...');
+      await this.syncFromWikidata(100);
+    });
+
+    console.log('[Automation] Scheduled cron jobs active (RSS AI Discovery + Wikidata Registry Sync).');
+  }
 }
 
-module.exports = {
-  startLiveNewsUpdates,
-};
+module.exports = new AutomatedDroneDiscoveryService();

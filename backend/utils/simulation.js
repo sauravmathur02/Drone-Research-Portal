@@ -1,110 +1,66 @@
 /**
- * Pk = detection * tracking * intercept
- * detection = tracking_accuracy * (1 - stealth_score)
- * tracking = tracking_accuracy
- * intercept = effectiveness (0–1)
+ * Aerospace Physics & Academic UAV Flight Calculator
  */
+function calculateFlightPhysics({
+  frameWeightKg = 1.5,
+  batteryWeightKg = 0.8,
+  payloadWeightKg = 0.5,
+  batteryCapacityMah = 10000,
+  batteryVoltageV = 22.2, // 6S LiPo
+  rotorCount = 4,
+  propDiameterInch = 15,
+  motorKv = 380,
+  maxThrustPerMotorKg = 2.2
+}) {
+  const totalWeightKg = Number(frameWeightKg) + Number(batteryWeightKg) + Number(payloadWeightKg);
+  const totalMaxThrustKg = Number(rotorCount) * Number(maxThrustPerMotorKg);
+  const thrustToWeightRatio = totalWeightKg > 0 ? +(totalMaxThrustKg / totalWeightKg).toFixed(2) : 0;
 
-function stealthScoreFromDrone(drone) {
-  const level = drone?.specs?.stealth_level || 'Low';
-  if (level === 'High') return 0.85;
-  if (level === 'Medium') return 0.5;
-  return 0.2;
-}
+  // Air density at sea level (kg/m^3)
+  const rho = 1.225;
+  const propRadiusM = (Number(propDiameterInch) * 0.0254) / 2;
+  const totalDiskAreaM2 = Number(rotorCount) * Math.PI * Math.pow(propRadiusM, 2);
 
-function trackingAccuracyFromCounter(counter) {
-  const t = counter?.tracking_type || 'Semi-auto';
-  const map = {
-    Manual: 0.55,
-    'Semi-auto': 0.72,
-    'Fully-auto': 0.86,
-    'AI-guided': 0.94,
+  // Ideal Hover Power via Momentum Theory: P_ideal = (T^(3/2)) / sqrt(2 * rho * A)
+  const weightNewtons = totalWeightKg * 9.81;
+  const figureOfMerit = 0.72; // Typical multirotor efficiency (72%)
+  const hoverPowerWatts =
+    totalDiskAreaM2 > 0
+      ? Math.pow(weightNewtons, 1.5) / (Math.sqrt(2 * rho * totalDiskAreaM2) * figureOfMerit)
+      : 0;
+
+  // Avionics & ESC overhead (~35W)
+  const totalHoverPowerW = hoverPowerWatts + 35;
+  const hoverCurrentAmps = batteryVoltageV > 0 ? totalHoverPowerW / batteryVoltageV : 0;
+
+  // Usable battery energy (80% depth of discharge for LiPo safety)
+  const usableCapacityAh = (Number(batteryCapacityMah) / 1000) * 0.8;
+  const hoverEnduranceMinutes =
+    hoverCurrentAmps > 0 ? +((usableCapacityAh / hoverCurrentAmps) * 60).toFixed(1) : 0;
+
+  // Flight safety & academic assessment
+  let flightViability = 'Optimal';
+  const warnings = [];
+
+  if (thrustToWeightRatio < 1.2) {
+    flightViability = 'Cannot Take Off / Unsafe';
+    warnings.push('Thrust-to-weight ratio is below 1.2:1. The UAV cannot maintain controlled hover.');
+  } else if (thrustToWeightRatio < 1.8) {
+    flightViability = 'Sluggish (Heavy Payload)';
+    warnings.push('Thrust-to-weight ratio is under 2.0:1. Reduced wind resistance and slow climb rate.');
+  }
+
+  return {
+    totalWeightKg: +totalWeightKg.toFixed(2),
+    totalMaxThrustKg: +totalMaxThrustKg.toFixed(2),
+    thrustToWeightRatio,
+    hoverPowerWatts: Math.round(totalHoverPowerW),
+    hoverCurrentAmps: +hoverCurrentAmps.toFixed(1),
+    hoverEnduranceMinutes,
+    diskLoadingKgM2: totalDiskAreaM2 > 0 ? +(totalWeightKg / totalDiskAreaM2).toFixed(2) : 0,
+    flightViability,
+    warnings
   };
-  return map[t] ?? 0.72;
 }
 
-function effectivenessToIntercept(effectiveness) {
-  if (effectiveness === 'High') return 0.9;
-  if (effectiveness === 'Medium') return 0.6;
-  if (effectiveness === 'Low') return 0.35;
-  return 0.5;
-}
-
-function computePk(drone, counter) {
-  return computePkContextual(drone, counter, null);
-}
-
-/**
- * @param {object|null} context from detectQueryContext: { night, stealthFocus, swarm }
- */
-function computePkContextual(drone, counter, context) {
-  const tracking_accuracy = trackingAccuracyFromCounter(counter);
-  const stealth_score = stealthScoreFromDrone(drone);
-  const intercept = effectivenessToIntercept(counter.effectiveness);
-
-  let detection = tracking_accuracy * (1 - stealth_score);
-
-  if (context?.night) {
-    const st = counter?.sensor_type || '';
-    if (st === 'Radar') detection *= 0.88;
-    else if (st === 'IR' || st === 'Optical' || st === 'Multi-sensor') detection *= 1.08;
-    else if (st === 'EW') detection *= 1.04;
-  }
-
-  if (context?.stealthFocus) {
-    detection *= 0.9;
-  }
-
-  const tracking = tracking_accuracy;
-  let pk = detection * tracking * intercept;
-
-  if (context?.swarm) {
-    pk *= swarmEngagementScale(drone, counter);
-  }
-
-  return Math.max(0, Math.min(1, pk));
-}
-
-function swarmEngagementScale(drone, counter) {
-  const st = Number(counter?.simultaneous_targets) || 1;
-  const isSwarmDrone = drone?.type === 'Swarm';
-
-  if (isSwarmDrone) {
-    if (st >= 4) return 1.06;
-    if (st >= 2) return 0.94;
-    if (counter?.type === 'Jamming') return 0.98;
-    return 0.84;
-  }
-
-  if (st >= 4) return 1.02;
-  if (st < 2) return 0.93;
-  return 1;
-}
-
-/**
- * Second-layer engagement: best counter vs this drone (max Pk), optional query context.
- */
-function bestEngagementForDrone(drone, counters, context = null) {
-  if (!drone || !counters?.length) {
-    return { bestPk: 0, bestCounter: null };
-  }
-  let bestPk = -1;
-  let bestCounter = null;
-  for (const counter of counters) {
-    const pk = computePkContextual(drone, counter, context);
-    if (pk > bestPk) {
-      bestPk = pk;
-      bestCounter = counter;
-    }
-  }
-  return { bestPk: Math.max(0, bestPk), bestCounter };
-}
-
-module.exports = {
-  computePk,
-  computePkContextual,
-  bestEngagementForDrone,
-  stealthScoreFromDrone,
-  trackingAccuracyFromCounter,
-  effectivenessToIntercept,
-};
+module.exports = { calculateFlightPhysics };

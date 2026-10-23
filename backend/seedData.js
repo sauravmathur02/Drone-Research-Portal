@@ -1,601 +1,307 @@
 const Drone = require('./models/Drone');
-const Country = require('./models/Country');
-const CounterSystem = require('./models/CounterSystem');
 
-async function seedDatabase() {
-  const droneCount = await Drone.countDocuments();
-
-  if (droneCount > 0) {
-    console.log('Database already populated. Skipping seed.');
-    return;
+const INITIAL_DRONES = [
+  {
+    name: 'MQ-9 Reaper',
+    manufacturer: 'General Atomics',
+    country: 'United States',
+    countryCode: 'US',
+    category: 'MALE / HALE Surveillance',
+    role: 'Long-Endurance High-Altitude Surveillance & Reconnaissance',
+    introducedYear: 2007,
+    status: 'Active',
+    image: '/drones/mq9.jpg',
+    specifications: {
+      maxSpeedKmh: 482,
+      rangeKm: 1850,
+      enduranceHours: 27,
+      serviceCeilingM: 15240,
+      maxTakeoffWeightKg: 4760,
+      payloadCapacityKg: 1700,
+      wingspanOrDiameterM: 20.1,
+      propulsionType: 'Turboprop',
+      autonomyLevel: 'GPS Waypoint'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'High-aspect-ratio low-drag laminar wing with Y-tail empennage',
+      controlArchitecture: 'Triple-redundant flight control computer with Ku-band SATCOM beyond-line-of-sight link',
+      sensorSuite: ['MTS-B Multi-Spectral Targeting System', 'Lynx Synthetic Aperture Radar', 'AIS Maritime Transponder'],
+      learningTakeaways: ['Demonstrates how high aspect ratio wings maximize lift-to-drag ratio (L/D) for 27-hour endurance']
+    },
+    description: 'A turboprop-powered, multi-mission Medium-Altitude Long-Endurance (MALE) remotely piloted aircraft used for wide-area surveillance and scientific atmospheric monitoring.'
+  },
+  {
+    name: 'DRDO TAPAS-BH-201',
+    manufacturer: 'Aeronautical Development Establishment (DRDO) / HAL',
+    country: 'India',
+    countryCode: 'IN',
+    category: 'MALE / HALE Surveillance',
+    role: 'Indigenous Medium-Altitude Long-Endurance ISTAR Platform',
+    introducedYear: 2023,
+    status: 'Active',
+    image: '/drones/tapas.jpg',
+    specifications: {
+      maxSpeedKmh: 225,
+      rangeKm: 1000,
+      enduranceHours: 18,
+      serviceCeilingM: 9144,
+      maxTakeoffWeightKg: 1800,
+      payloadCapacityKg: 350,
+      wingspanOrDiameterM: 20.6,
+      propulsionType: 'Turboprop',
+      autonomyLevel: 'GPS Waypoint'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'Twin-wingtractor configuration with composite airframe and T-tail',
+      controlArchitecture: 'Indigenous GAGAN-enabled autonomous takeoff and landing (ATOL) system',
+      sensorSuite: ['EO/IR Stabilized Payload', 'Synthetic Aperture Radar (SAR)', 'Medium Range Electro-Optical (MREO)'],
+      learningTakeaways: ['Illustrates indigenous autonomous takeoff and landing using satellite-based augmentation systems (SBAS)']
+    },
+    description: 'An Indian Medium-Altitude Long-Endurance unmanned aerial vehicle developed by DRDO featuring fully autonomous takeoff and landing capabilities.'
+  },
+  {
+    name: 'Drishti-10 Starliner (Hermes 900)',
+    manufacturer: 'Adani Defence & Aerospace / Elbit Systems',
+    country: 'India',
+    countryCode: 'IN',
+    category: 'MALE / HALE Surveillance',
+    role: 'All-Weather Maritime & Land Intelligence, Surveillance, and Reconnaissance',
+    introducedYear: 2024,
+    status: 'Active',
+    image: '/drones/drishti10.jpg',
+    specifications: {
+      maxSpeedKmh: 220,
+      rangeKm: 2000,
+      enduranceHours: 36,
+      serviceCeilingM: 9150,
+      maxTakeoffWeightKg: 1180,
+      payloadCapacityKg: 450,
+      wingspanOrDiameterM: 15.0,
+      propulsionType: 'Piston Engine',
+      autonomyLevel: 'GPS Waypoint'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'High-wing cantilever monoplane with V-tail reducing wetted surface area',
+      controlArchitecture: 'STANAG 4671 certified airworthiness architecture for civil/non-segregated airspace',
+      sensorSuite: ['Multi-Mode Maritime Radar', 'SkEye Wide-Area Persistent Stare', 'Automatic Identification System (AIS)'],
+      learningTakeaways: ['Shows V-tail ruddervator control mixing where pitch and yaw moments are coupled']
+    },
+    description: 'An all-weather MALE UAV certified to fly in civilian airspace, capable of 36-hour continuous endurance with a 450 kg modular payload bay.'
+  },
+  {
+    name: 'ideaForge NETRA V4 PRO',
+    manufacturer: 'ideaForge Technology',
+    country: 'India',
+    countryCode: 'IN',
+    category: 'Commercial & Photography',
+    role: 'Quadcopter VTOL Mapping, Disaster Relief & Crowd Monitoring',
+    introducedYear: 2022,
+    status: 'Active',
+    image: '/drones/netra.png',
+    specifications: {
+      maxSpeedKmh: 54,
+      rangeKm: 15,
+      enduranceHours: 1.5,
+      serviceCeilingM: 5500,
+      maxTakeoffWeightKg: 7.5,
+      payloadCapacityKg: 1.2,
+      wingspanOrDiameterM: 1.1,
+      propulsionType: 'LiPo Multirotor',
+      autonomyLevel: 'Obstacle Avoidance'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'High-efficiency carbon-fiber quadrotor optimized for high-altitude thin air density',
+      controlArchitecture: 'Fail-safe return-to-home (RTH) on communication loss or low battery voltage',
+      sensorSuite: ['HD Day/Thermal Dual Gimbal', 'PPK/RTK Survey Module', 'Barometric Altimeter'],
+      learningTakeaways: ['Demonstrates high-altitude propeller pitch optimization where air density drops below 0.7 kg/m³']
+    },
+    description: 'A ruggedized Indian VTOL quadcopter designed for high-altitude surveying, search-and-rescue, and emergency response operations.'
+  },
+  {
+    name: 'ideaForge SWITCH UAV',
+    manufacturer: 'ideaForge Technology',
+    country: 'India',
+    countryCode: 'IN',
+    category: 'Academic & Research',
+    role: 'Hybrid Fixed-Wing VTOL Photogrammetry & Long-Range Inspection',
+    introducedYear: 2021,
+    status: 'Active',
+    image: '/drones/switch.png',
+    specifications: {
+      maxSpeedKmh: 72,
+      rangeKm: 25,
+      enduranceHours: 2.0,
+      serviceCeilingM: 4500,
+      maxTakeoffWeightKg: 6.5,
+      payloadCapacityKg: 0.8,
+      wingspanOrDiameterM: 2.6,
+      propulsionType: 'Hybrid-Electric',
+      autonomyLevel: 'GPS Waypoint'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'QuadPlane hybrid VTOL: 4 vertical lift rotors + 1 pusher cruise propeller',
+      controlArchitecture: 'Transition flight control law blending hover PID loops with fixed-wing TECS (Total Energy Control System)',
+      sensorSuite: ['25x Optical Zoom', '640x480 Thermal Radiometric Sensor'],
+      learningTakeaways: ['Ideal case study for VTOL-to-Fixed-Wing transition aerodynamics and stall prevention']
+    },
+    description: 'A hybrid VTOL and fixed-wing UAV combining runway-independent vertical takeoff with efficient winged cruise flight.'
+  },
+  {
+    name: 'IoTechWorld AgriBot',
+    manufacturer: 'IoTechWorld Avigation',
+    country: 'India',
+    countryCode: 'IN',
+    category: 'Agricultural',
+    role: 'Precision Agriculture Crop Spraying & Multispectral Soil Health Analysis',
+    introducedYear: 2022,
+    status: 'Active',
+    image: '/drones/agribot.png',
+    specifications: {
+      maxSpeedKmh: 36,
+      rangeKm: 3,
+      enduranceHours: 0.4,
+      serviceCeilingM: 500,
+      maxTakeoffWeightKg: 29.5,
+      payloadCapacityKg: 10.0,
+      wingspanOrDiameterM: 1.8,
+      propulsionType: 'LiPo Multirotor',
+      autonomyLevel: 'Obstacle Avoidance'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'Hexacopter downwash vortex utilization for uniform foliar droplet penetration',
+      controlArchitecture: 'Terrain-following millimeter-wave radar with dynamic variable-mass PID gain scheduling',
+      sensorSuite: ['Millimeter-Wave Terrain Radar', 'Flowmeter Nozzle Controller', 'NDVI Multispectral Camera'],
+      learningTakeaways: ['Shows how flight controllers adapt PID gains dynamically as liquid payload mass decreases mid-flight']
+    },
+    description: 'DGCA type-certified agricultural hexacopter engineered for autonomous precision crop spraying and NDVI crop health analytics.'
+  },
+  {
+    name: 'Archer Midnight eVTOL',
+    manufacturer: 'Archer Aviation',
+    country: 'United States',
+    countryCode: 'US',
+    category: 'Urban Air Mobility (eVTOL)',
+    role: 'Electric Vertical Takeoff and Landing Air Taxi',
+    introducedYear: 2025,
+    status: 'Active',
+    image: '/drones/airtaxi.jpg',
+    specifications: {
+      maxSpeedKmh: 241,
+      rangeKm: 160,
+      enduranceHours: 1.0,
+      serviceCeilingM: 3000,
+      maxTakeoffWeightKg: 3175,
+      payloadCapacityKg: 454,
+      wingspanOrDiameterM: 14.6,
+      propulsionType: 'Electric Brushless',
+      autonomyLevel: 'Obstacle Avoidance'
+    },
+    academicNotes: {
+      aerodynamicProfile: '12-propeller distributed electric propulsion (DEP): 6 tilt-props forward + 6 aft lift-only props',
+      controlArchitecture: 'Fly-by-wire fault-tolerant architecture with 6 independent battery packs',
+      sensorSuite: ['Redundant Air Data Computers', 'Radar Altimeters', 'Electro-Optical Detect-and-Avoid'],
+      learningTakeaways: ['Demonstrates Distributed Electric Propulsion (DEP) acoustic reduction and tilt-rotor transition']
+    },
+    description: 'A next-generation electric vertical takeoff and landing (eVTOL) aircraft designed for sustainable, low-noise urban air mobility.'
+  },
+  {
+    name: 'Black Hornet 4 PRS',
+    manufacturer: 'Teledyne FLIR',
+    country: 'Norway',
+    countryCode: 'NO',
+    category: 'Micro / Nano UAV',
+    role: 'Pocket-Sized Nano-UAV for Indoor & Confined-Space Reconnaissance',
+    introducedYear: 2023,
+    status: 'Active',
+    image: '/drones/blackhornet.png',
+    specifications: {
+      maxSpeedKmh: 36,
+      rangeKm: 3,
+      enduranceHours: 0.55,
+      serviceCeilingM: 2000,
+      maxTakeoffWeightKg: 0.07,
+      payloadCapacityKg: 0.015,
+      wingspanOrDiameterM: 0.19,
+      propulsionType: 'Electric Brushless',
+      autonomyLevel: 'Full Autonomous SLAM'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'Single-main-rotor swashplate nano-helicopter operating in low Reynolds number regime (Re < 50,000)',
+      controlArchitecture: 'Visual-Inertial Odometry (VIO) for GPS-denied indoor navigation',
+      sensorSuite: ['12MP Low-Light Optical', 'High-Res Thermal Micro-Bolometer', 'Optical Flow Sensor'],
+      learningTakeaways: ['Explores low-Reynolds-number boundary layer aerodynamics and ultra-low-SWaP (Size, Weight, and Power) avionics']
+    },
+    description: 'Weighing just 70 grams, this nano-UAV uses single-rotor helicopter mechanics and visual-inertial odometry to operate in GPS-denied environments.'
+  },
+  {
+    name: 'Bayraktar TB2',
+    manufacturer: 'Baykar',
+    country: 'Turkey',
+    countryCode: 'TR',
+    category: 'MALE / HALE Surveillance',
+    role: 'Medium-Altitude Long-Endurance Tactical UAV',
+    introducedYear: 2014,
+    status: 'Active',
+    image: '/drones/tb2.png',
+    specifications: {
+      maxSpeedKmh: 220,
+      rangeKm: 300,
+      enduranceHours: 27,
+      serviceCeilingM: 7620,
+      maxTakeoffWeightKg: 700,
+      payloadCapacityKg: 150,
+      wingspanOrDiameterM: 12.0,
+      propulsionType: 'Piston Engine',
+      autonomyLevel: 'GPS Waypoint'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'Inverted V-tail twin-boom pusher configuration isolating fuselage sensors from exhaust vibration',
+      controlArchitecture: 'Triple-redundant sensor fusion flight control system',
+      sensorSuite: ['WESCAM MX-15D / CATS EO/IR', 'Laser Rangefinder', 'Pitot-Static Air Data System'],
+      learningTakeaways: ['Twin-boom pusher layout keeps the nose cone completely unobstructed for 360-degree gimbal optics']
+    },
+    description: 'A widely studied twin-boom pusher MALE unmanned aerial vehicle featuring carbon-fiber monocoque construction and triple-redundant avionics.'
+  },
+  {
+    name: 'Swarm-X Collaborative Mesh',
+    manufacturer: 'Autonomous Robotics Consortium',
+    country: 'United States',
+    countryCode: 'US',
+    category: 'Autonomous Swarm',
+    role: 'Decentralized Multi-Agent Search, Mapping & Environmental Sensing',
+    introducedYear: 2025,
+    status: 'Prototype',
+    image: '/drones/swarmx.jpg',
+    specifications: {
+      maxSpeedKmh: 95,
+      rangeKm: 45,
+      enduranceHours: 1.8,
+      serviceCeilingM: 3500,
+      maxTakeoffWeightKg: 4.2,
+      payloadCapacityKg: 1.0,
+      wingspanOrDiameterM: 0.65,
+      propulsionType: 'LiPo Multirotor',
+      autonomyLevel: 'AI Swarm Collaborative'
+    },
+    academicNotes: {
+      aerodynamicProfile: 'Ducted-fan shrouded quadrotor for close-proximity collision resilience',
+      controlArchitecture: 'Decentralized Boids/Consensus flocking algorithm over Ultra-Wideband (UWB) relative ranging mesh',
+      sensorSuite: ['3D Solid-State LiDAR', 'UWB Inter-Drone Transceiver', 'Stereo Depth Cameras'],
+      learningTakeaways: ['Key academic reference for decentralized consensus algorithms, Voronoi area partitioning, and SLAM map merging']
+    },
+    description: 'An academic and industrial swarm robotics platform that coordinates dozens of UAVs using decentralized mesh networking and collaborative 3D SLAM.'
   }
+];
 
-  console.log('Seeding database...');
-
-  const countries = [
-    {
-      code: 'USA',
-      name: 'United States',
-      lat: 38.9072,
-      lng: -77.0369,
-      drone_count: 12500,
-      specialization: 'HALE / Precision Strike',
-      top_drones: ['MQ-9 Reaper', 'RQ-4 Global Hawk'],
-      growth_rate: 15,
-    },
-    {
-      code: 'CHN',
-      name: 'China',
-      lat: 39.9042,
-      lng: 116.4074,
-      drone_count: 14200,
-      specialization: 'Swarm / Stealth',
-      top_drones: ['CH-4 Rainbow', 'Wing Loong II'],
-      growth_rate: 32,
-    },
-    {
-      code: 'RUS',
-      name: 'Russia',
-      lat: 55.7558,
-      lng: 37.6173,
-      drone_count: 8900,
-      specialization: 'Loitering Munitions',
-      top_drones: ['Lancet-1', 'Orion (Inokhodets)'],
-      growth_rate: 20,
-    },
-    {
-      code: 'IND',
-      name: 'India',
-      lat: 28.6139,
-      lng: 77.209,
-      drone_count: 5400,
-      specialization: 'Tactical Recon',
-      top_drones: ['Tapas BH-201', 'Netra'],
-      growth_rate: 25,
-    },
-    {
-      code: 'ISR',
-      name: 'Israel',
-      lat: 31.0461,
-      lng: 34.8516,
-      drone_count: 4800,
-      specialization: 'Loitering / Mini-Tactical',
-      top_drones: ['Hero-120', 'Hermes 900'],
-      growth_rate: 10,
-    },
-  ];
-
-  const drones = [
-    {
-      name: 'Black Hornet 3',
-      country: 'USA',
-      type: 'Nano',
-      specs: {
-        price_usd: 195000,
-        range_km: 2,
-        endurance_hr: 0.4,
-        payload_kg: 0,
-        speed_kmh: 21,
-        maintenance_cost_per_hr: 50,
-      },
-      photo_url: '/drones/blackhornet.png',
-      description: 'Ultra-light reconnaissance drone for close-range intelligence gathering.',
-    },
-    {
-      name: 'CH-4 Rainbow',
-      country: 'China',
-      type: 'MALE',
-      specs: {
-        price_usd: 4000000,
-        range_km: 2750,
-        endurance_hr: 30,
-        payload_kg: 345,
-        speed_kmh: 350,
-        maintenance_cost_per_hr: 1200,
-        stealth_level: 'Low',
-      },
-      photo_url: '/drones/ch4.jpg',
-      description: 'Medium-altitude drone built for surveillance and precision strike support.',
-    },
-    {
-      name: 'MQ-9 Reaper',
-      country: 'USA',
-      type: 'MALE',
-      specs: {
-        price_usd: 32000000,
-        range_km: 1850,
-        endurance_hr: 24,
-        payload_kg: 1700,
-        speed_kmh: 480,
-        maintenance_cost_per_hr: 3600,
-        stealth_level: 'Low',
-      },
-      photo_url: '/drones/mq9.jpg',
-      description: 'Long-range ISR and strike drone with heavy payload flexibility.',
-    },
-    {
-      name: 'Bayraktar TB2',
-      country: 'Turkey',
-      type: 'Tactical',
-      specs: {
-        price_usd: 5000000,
-        range_km: 300,
-        endurance_hr: 27,
-        payload_kg: 150,
-        speed_kmh: 220,
-        maintenance_cost_per_hr: 800,
-      },
-      photo_url: '/drones/tb2.png',
-      description: 'Combat-proven tactical UAV for intelligence and light strike missions.',
-    },
-    {
-      name: 'Shahed 136',
-      country: 'Iran',
-      type: 'Loitering',
-      specs: {
-        price_usd: 20000,
-        range_km: 2500,
-        endurance_hr: 12,
-        payload_kg: 40,
-        speed_kmh: 185,
-        maintenance_cost_per_hr: 10,
-      },
-      photo_url: '/drones/shahed136.jpg',
-      description: 'Long-range loitering munition designed for saturation attacks.',
-    },
-    {
-      name: 'Hero-120',
-      country: 'Israel',
-      type: 'Loitering',
-      specs: {
-        price_usd: 150000,
-        range_km: 60,
-        endurance_hr: 1,
-        payload_kg: 4.5,
-        speed_kmh: 100,
-        maintenance_cost_per_hr: 20,
-      },
-      photo_url: '/drones/hero120.jpg',
-      description: 'Portable loitering platform suited to tactical precision engagements.',
-    },
-    {
-      name: 'Tapas BH-201',
-      country: 'India',
-      type: 'MALE',
-      specs: {
-        price_usd: 10000000,
-        range_km: 250,
-        endurance_hr: 24,
-        payload_kg: 350,
-        speed_kmh: 224,
-        maintenance_cost_per_hr: 900,
-      },
-      image: '/drones/tapas.jpg',
-      description: 'Endurance-focused surveillance drone for medium-altitude missions.',
-    },
-    {
-      name: 'Swarm Variant X',
-      country: 'China',
-      type: 'Swarm',
-      specs: {
-        price_usd: 5000,
-        range_km: 20,
-        endurance_hr: 0.5,
-        payload_kg: 2,
-        speed_kmh: 120,
-        maintenance_cost_per_hr: 10,
-      },
-      image: '/drones/swarmx.jpg',
-      description: 'Autonomous low-cost drone optimized for coordinated swarm attacks.',
-    },
-    {
-      name: 'MQ-1 Predator',
-      country: 'USA',
-      type: 'MALE',
-      specs: {
-        price_usd: 4500000,
-        range_km: 1250,
-        endurance_hr: 24,
-        payload_kg: 204,
-        speed_kmh: 217,
-        stealth_level: 'Low',
-      },
-      description: 'American medium-altitude long-endurance UAV used for reconnaissance and armed missions.',
-    },
-    {
-      name: 'RQ-4 Global Hawk',
-      country: 'USA',
-      type: 'HALE',
-      specs: {
-        price_usd: 220000000,
-        range_km: 22796,
-        endurance_hr: 34,
-        payload_kg: 1360,
-        speed_kmh: 574,
-        stealth_level: 'Low',
-      },
-      description: 'American high-altitude, long-endurance UAV for strategic reconnaissance missions.',
-    },
-    {
-      name: 'RQ-170 Sentinel',
-      country: 'USA',
-      type: 'UCAV',
-      specs: {
-        price_usd: 100000000,
-        range_km: null,
-        endurance_hr: 6,
-        payload_kg: null,
-        speed_kmh: null,
-        stealth_level: 'High',
-      },
-      description: 'Stealth unmanned aerial vehicle developed by the USA for reconnaissance missions.',
-    },
-    {
-      name: 'MQ-8 Fire Scout',
-      country: 'USA',
-      type: 'Tactical',
-      specs: {
-        price_usd: 20000000,
-        range_km: 278,
-        endurance_hr: 12,
-        payload_kg: 317,
-        speed_kmh: 250,
-        stealth_level: 'Low',
-      },
-      description: 'American unmanned helicopter (tactical UAV) used for naval reconnaissance and surveillance.',
-    },
-    {
-      name: 'RQ-7 Shadow',
-      country: 'USA',
-      type: 'Tactical',
-      specs: {
-        price_usd: 1000000,
-        range_km: 125,
-        endurance_hr: 8,
-        payload_kg: 43,
-        speed_kmh: null,
-        stealth_level: 'Low',
-      },
-      description: 'American tactical UAV used for battlefield surveillance and reconnaissance.',
-    },
-    {
-      name: 'Switchblade 300',
-      country: 'USA',
-      type: 'Loitering',
-      specs: {
-        price_usd: 60000,
-        range_km: 30,
-        endurance_hr: 0.33,
-        payload_kg: 1.68,
-        speed_kmh: 161,
-        stealth_level: 'Low',
-      },
-      description: 'American portable loitering munition (kamikaze drone) for precision strikes.',
-    },
-    {
-      name: 'MQ-4C Triton',
-      country: 'USA',
-      type: 'HALE',
-      specs: {
-        price_usd: 165000000,
-        range_km: 15200,
-        endurance_hr: 30,
-        payload_kg: null,
-        speed_kmh: 575,
-        stealth_level: 'Low',
-      },
-      description: 'American HALE UAV for persistent maritime surveillance.',
-    },
-    {
-      name: 'Wing Loong II',
-      country: 'China',
-      type: 'MALE',
-      specs: {
-        price_usd: 4500000,
-        range_km: 4000,
-        endurance_hr: 32,
-        payload_kg: 480,
-        speed_kmh: 370,
-        stealth_level: 'Low',
-      },
-      description: 'Chinese medium-altitude long-endurance unmanned combat aerial vehicle with strike capability.',
-    },
-    {
-      name: 'Wing Loong I',
-      country: 'China',
-      type: 'MALE',
-      specs: {
-        price_usd: 2500000,
-        range_km: 4000,
-        endurance_hr: 20,
-        payload_kg: 1000,
-        speed_kmh: 280,
-        stealth_level: 'Low',
-      },
-      description: 'Chinese medium-altitude long-endurance UAV used for surveillance and strike missions.',
-    },
-    {
-      name: 'CH-5 Rainbow',
-      country: 'China',
-      type: 'MALE',
-      specs: {
-        price_usd: 8000000,
-        range_km: 10000,
-        endurance_hr: 60,
-        payload_kg: 1000,
-        speed_kmh: 480,
-        stealth_level: 'Low',
-      },
-      description: 'Chinese heavy MALE UAV for long-range surveillance and strike missions.',
-    },
-    {
-      name: 'WZ-7 Soar Dragon',
-      country: 'China',
-      type: 'HALE',
-      specs: {
-        price_usd: 100000000,
-        range_km: 7000,
-        endurance_hr: 10,
-        payload_kg: null,
-        speed_kmh: 750,
-        stealth_level: 'Low',
-      },
-      description: 'Chinese high-altitude long-endurance UAV for strategic reconnaissance.',
-    },
-    {
-      name: 'Orion (Inokhodets)',
-      country: 'Russia',
-      type: 'MALE',
-      specs: {
-        price_usd: 15000000,
-        range_km: 1440,
-        endurance_hr: 24,
-        payload_kg: 250,
-        speed_kmh: 200,
-        stealth_level: 'Low',
-      },
-      description: 'Russian medium-altitude long-endurance UAV for surveillance and attack missions.',
-    },
-    {
-      name: 'Forpost R',
-      country: 'Russia',
-      type: 'MALE',
-      specs: {
-        price_usd: 9000000,
-        range_km: 350,
-        endurance_hr: 18,
-        payload_kg: null,
-        speed_kmh: null,
-        stealth_level: 'Low',
-      },
-      description: 'Russian license-built MALE UAV (IAI Heron variant) for reconnaissance.',
-    },
-    {
-      name: 'S-70 Okhotnik (Hunter)',
-      country: 'Russia',
-      type: 'UCAV',
-      specs: {
-        price_usd: 500000000,
-        range_km: 6000,
-        endurance_hr: 10,
-        payload_kg: 2000,
-        speed_kmh: 1000,
-        stealth_level: 'High',
-      },
-      description: 'Russian stealth heavy unmanned combat aerial vehicle for strike missions.',
-    },
-    {
-      name: 'Orlan-10',
-      country: 'Russia',
-      type: 'Tactical',
-      specs: {
-        price_usd: 150000,
-        range_km: 600,
-        endurance_hr: 16,
-        payload_kg: 6,
-        speed_kmh: 150,
-        stealth_level: 'Low',
-      },
-      description: 'Russian tactical UAV used for battlefield reconnaissance.',
-    },
-    {
-      name: 'Lancet-1',
-      country: 'Russia',
-      type: 'Loitering',
-      specs: {
-        price_usd: 40000,
-        range_km: 40,
-        endurance_hr: 0.5,
-        payload_kg: 1,
-        speed_kmh: 110,
-        stealth_level: 'Low',
-      },
-      description: 'Russian small loitering munition for kamikaze strikes.',
-    },
-    {
-      name: 'Heron',
-      country: 'Israel',
-      type: 'MALE',
-      specs: {
-        price_usd: 2500000,
-        range_km: 1000,
-        endurance_hr: 52,
-        payload_kg: 250,
-        speed_kmh: 207,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli medium-altitude long-endurance UAV for surveillance missions.',
-    },
-    {
-      name: 'TAPAS Rustom-II',
-      country: 'India',
-      type: 'MALE',
-      specs: {
-        price_usd: 12000000,
-        range_km: 1000,
-        endurance_hr: 24,
-        payload_kg: 350,
-        speed_kmh: 250,
-        stealth_level: 'Low',
-      },
-      description: 'Indian medium-altitude long-endurance UAV for surveillance and strike.',
-    },
-    {
-      name: 'Harop',
-      country: 'Israel',
-      type: 'Loitering',
-      specs: {
-        price_usd: 300000,
-        range_km: 200,
-        endurance_hr: 6,
-        payload_kg: 16,
-        speed_kmh: 417,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli loitering munition for precision strike missions.',
-    },
-    {
-      name: 'Switch UAV',
-      country: 'India',
-      type: 'Tactical',
-      specs: {
-        price_usd: 350000,
-        range_km: 15,
-        endurance_hr: 2,
-        payload_kg: 7,
-        speed_kmh: 47,
-        stealth_level: 'Low',
-      },
-      description: 'Indian VTOL hybrid UAV for surveillance and reconnaissance.',
-    },
-    {
-      name: 'Nishant',
-      country: 'India',
-      type: 'Tactical',
-      specs: {
-        price_usd: 250000,
-        range_km: 100,
-        endurance_hr: 4.5,
-        payload_kg: 45,
-        speed_kmh: 216,
-        stealth_level: 'Low',
-      },
-      description: 'Indian battlefield UAV for reconnaissance and surveillance.',
-    },
-    {
-      name: 'Hermes 450',
-      country: 'Israel',
-      type: 'Tactical',
-      specs: {
-        price_usd: 3000000,
-        range_km: 300,
-        endurance_hr: 17,
-        payload_kg: 180,
-        speed_kmh: 176,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli tactical UAV for surveillance and reconnaissance missions.',
-    },
-    {
-      name: 'Hermes 900',
-      country: 'Israel',
-      type: 'MALE',
-      specs: {
-        price_usd: 12000000,
-        range_km: null,
-        endurance_hr: 36,
-        payload_kg: 350,
-        speed_kmh: 220,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli MALE UAV for long-endurance surveillance and target acquisition.',
-    },
-    {
-      name: 'Skylark I',
-      country: 'Israel',
-      type: 'Tactical',
-      specs: {
-        price_usd: 60000,
-        range_km: 40,
-        endurance_hr: 3,
-        payload_kg: 5,
-        speed_kmh: 60,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli small tactical UAV for short-range reconnaissance missions.',
-    },
-    {
-      name: 'Eitan (Heron TP)',
-      country: 'Israel',
-      type: 'MALE',
-      specs: {
-        price_usd: 80000000,
-        range_km: 7400,
-        endurance_hr: 30,
-        payload_kg: 2700,
-        speed_kmh: 407,
-        stealth_level: 'Low',
-      },
-      description: 'Israeli advanced MALE UAV designed for extended range and high-payload missions.',
+async function ensureSeedData() {
+  const count = await Drone.countDocuments();
+  if (count === 0) {
+    console.log('[Seed] Populating initial drone encyclopedia...');
+    for (const drone of INITIAL_DRONES) {
+      await Drone.create(drone);
     }
-  ];
-
-  const counterSystems = [
-    {
-      name: 'Iron Beam',
-      type: 'Laser',
-      effective_against: ['Swarm', 'Nano', 'Loitering'],
-      range_km: 7,
-      effectiveness: 'High',
-      description: 'directed energy can engage many small drones quickly with precision and low per-shot cost.',
-    },
-    {
-      name: 'Titan C-UAS',
-      type: 'Jamming',
-      effective_against: ['Swarm', 'Nano', 'Tactical'],
-      range_km: 3,
-      effectiveness: 'High',
-      description: 'electronic attack breaks command links and navigation signals used by coordinated low-altitude raids.',
-    },
-    {
-      name: 'DroneHunter F700',
-      type: 'Interceptor',
-      effective_against: ['Tactical', 'MALE'],
-      range_km: 5,
-      effectiveness: 'Medium',
-      description: 'physical interception works when hostile drones resist spoofing or jamming.',
-    },
-    {
-      name: 'Patriot PAC-3',
-      type: 'Missile',
-      effective_against: ['HALE', 'MALE'],
-      range_km: 30,
-      effectiveness: 'High',
-      description: 'long-range missile defense is suitable for large, fast, high-altitude drones.',
-    },
-    {
-      name: 'Pantsir-S1',
-      type: 'Missile',
-      effective_against: ['Tactical', 'Loitering', 'MALE'],
-      range_km: 20,
-      effectiveness: 'Medium',
-      description: 'layered missile and gun coverage supports rapid responses to maneuvering drone threats.',
-    },
-    {
-      name: 'SkyFence EW',
-      type: 'Jamming',
-      effective_against: ['Loitering', 'Tactical'],
-      range_km: 4,
-      effectiveness: 'Low',
-      description: 'wide-area interference reduces guidance quality and weakens incoming attack waves.',
-    },
-  ];
-
-  await Country.insertMany(countries);
-  await Drone.insertMany(drones);
-  await CounterSystem.insertMany(counterSystems);
-
-  console.log('Database seeding complete.');
+    console.log(`[Seed] Inserted ${INITIAL_DRONES.length} baseline drones.`);
+  }
 }
 
-module.exports = seedDatabase;
+module.exports = { ensureSeedData, INITIAL_DRONES };

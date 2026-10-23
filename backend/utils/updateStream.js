@@ -1,28 +1,35 @@
-const clients = new Set();
+class UpdateStream {
+  constructor() {
+    this.clients = new Set();
+  }
 
-function addClient(response) {
-  clients.add(response);
+  addClient(req, res) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no'
+    });
 
-  return () => {
-    clients.delete(response);
-  };
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: new Date().toISOString() })}\n\n`);
+    this.clients.add(res);
+
+    req.on('close', () => {
+      this.clients.delete(res);
+    });
+  }
+
+  broadcast(eventType, payload) {
+    const message = `data: ${JSON.stringify({
+      type: eventType,
+      payload,
+      timestamp: new Date().toISOString()
+    })}\n\n`;
+
+    for (const client of this.clients) {
+      client.write(message);
+    }
+  }
 }
 
-function writeEvent(response, eventName, payload) {
-  response.write(`event: ${eventName}\n`);
-  response.write(`data: ${JSON.stringify(payload)}\n\n`);
-}
-
-function broadcastUpdate(update) {
-  clients.forEach((response) => writeEvent(response, 'update', update));
-}
-
-setInterval(() => {
-  clients.forEach((response) => response.write(': heartbeat\n\n'));
-}, 30000).unref();
-
-module.exports = {
-  addClient,
-  broadcastUpdate,
-  writeEvent,
-};
+module.exports = new UpdateStream();

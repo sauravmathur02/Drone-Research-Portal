@@ -1,42 +1,61 @@
 require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
-const connectDB = require('./config/db');
-const seedDatabase = require('./seedData');
-const { startLiveNewsUpdates } = require('./services/newsUpdateService');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const morgan = require('morgan');
+const apiRoutes = require('./routes/api');
+const { ensureSeedData } = require('./seedData');
+const discoveryService = require('./services/newsUpdateService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL, 'http://localhost:5173', 'http://localhost:5174'] : '*';
+// Security & Performance Middleware
+app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
+app.use(compression());
+app.use(express.json({ limit: '1mb' }));
+app.use(mongoSanitize());
+app.use(morgan('dev'));
 
-app.use(cors({
-  origin: allowedOrigins
-}));
-app.use(express.json());
+// Rate Limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api', apiLimiter);
 
 // Routes
-const apiRoutes = require('./routes/api');
 app.use('/api', apiRoutes);
 
-// Database Connection & Server Start
-async function startServer() {
-  try {
-    // Connect to MongoDB Atlas (via config/db.js)
-    await connectDB();
+// Health Check Endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
 
-    // Optionally seed Data if DB is likely empty
-    await seedDatabase();
-    await startLiveNewsUpdates();
+// Database Connection & Automated Discovery Startup
+mongoose
+  .connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/drone_research_portal')
+  .then(async () => {
+    console.log('[DB] Connected to MongoDB');
+    await ensureSeedData();
+    discoveryService.startCronJobs();
 
     app.listen(PORT, () => {
-      console.log(`🚀 DroneScope AI Backend running on port ${PORT}`);
+      console.log(`[Server] Drone Research Portal API running on port ${PORT}`);
     });
-  } catch (error) {
-    console.error('Failed to start server:', error);
+  })
+  .catch((err) => {
+    console.error('[DB] Connection Error:', err.message);
     process.exit(1);
-  }
-}
-
-startServer();
+  });
